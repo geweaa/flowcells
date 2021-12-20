@@ -13,3 +13,12 @@ smd.tsv
 smd.xlsx
 taxonomy.tsv
 transcripts
+eggnogs.tsv
+final.contigs.tsv
+flowcells_cache
+flowcells_files
+prokka.tsv
+smd_metat.tsv
+taxa.tsv
+amplicons.Rmd
+amplicons.Rproj
