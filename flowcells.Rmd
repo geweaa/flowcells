@@ -22,6 +22,7 @@ theme_tidy <- function() {
     axis.title.y = element_text(colour = "black", size = 8),
     axis.text.x = element_text(colour = "black", size = 8),
     axis.text.y = element_text(colour = "black", size = 8),
+    axis.ticks.y = elelement_blank(),
     legend.text = element_text(colour = "black", size = 8),
     strip.background = element_blank(),
     strip.placement = "outside",
@@ -276,6 +277,7 @@ ggsave("figures/barplot_order.pdf", height = 12, width = 16, units = "cm")
 
 ## Differential abundance and heatmap
 
+
 ```{r ALDEx2 analysis for differential ASV abundance, message=FALSE, warning=FALSE}
 seqtab %>%
   # Filter out very low abundant ASVs
@@ -286,6 +288,7 @@ seqtab %>%
   rownames_to_column("seqid") %>%
   inner_join(tax) -> aldex
 ```
+
 
 ```{r pheatmap}
 aldex %>%
@@ -359,6 +362,7 @@ seqtab %>%
   column_to_rownames('sample') %>% vegan::rda() -> pca
 ```
 
+
 ```{r Extract PCA values}
 pca.samples <- pca$CA$u %>% data.frame() %>% tibble::rownames_to_column('sample')
 pca.geneid    <- pca$CA$v %>% data.frame() %>% tibble::rownames_to_column('seqid')
@@ -366,6 +370,7 @@ pca.eigs    <- pca$CA$eig %>% data.frame() %>% tibble::rownames_to_column('pc') 
   rename(eigval = 2) %>%
   mutate(propexpl = eigval/sum(eigval))
 ```
+
 
 ```{r Plot PCA}
 pca.samples %>%
@@ -385,12 +390,14 @@ pca.samples %>%
         legend.background = element_blank())
 ```
 
+
 ```{r export PCA}
 ggsave("figures/pca_dna.pdf", width = 12, height = 12, units = "cm")
 ```
 
-## Read RNA files
+
 ## Load gene counts, taxonomy and sample metadata
+
 
 ```{r read data, message=FALSE, warning=FALSE}
 read_tsv('final.contigs.tsv') %>%
@@ -413,6 +420,7 @@ read_tsv('smd_metat.tsv') %>%
 # Taxonomy (NCBI)
 read_tsv('taxa.tsv', col_types = cols(.default = col_character())) -> ncbi
 ```
+
 
 ## PCA on Hellinger-transformed dataset RNA
 
@@ -639,6 +647,7 @@ seqcpm %>%
   coord_flip() + theme_barplot()
 ```
 
+
 ```{r export barplot mRNA phylum}
 ggsave("figures/fig4b.pdf", height = 14, width = 14, units = "cm")
 ```
@@ -677,6 +686,7 @@ seqcpm %>%
   theme_tidy() + 
   theme(panel.border = element_blank(), axis.ticks.y = element_blank())
 ```
+
 
 ```{r explot barplot eggnog}
 ggsave("figures/fig5.pdf", height = 14, width = 24, units = "cm")
