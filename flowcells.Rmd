@@ -1,5 +1,4 @@
 ---
----
 title: "Flowcells Äspö HRL"
 subtitle: "RaukR 2022 • Advanced R for Bioinformatics"
 author: "George Westmeijer"
@@ -26,7 +25,9 @@ knitr::opts_chunk$set(cache = TRUE)
 library(tidyverse)
 ```
 
+
 ## Define theme and function(s)
+
 
 ```{r set theme}
 theme_tidy <- function() {
@@ -227,7 +228,9 @@ read_tsv('seqtab.tsv', col_types = cols(.default = col_character(), count = col_
   select(seqid, sample, count, relab) -> seqtab
 ```
 
+
 ## Rarefaction
+
 
 ```{r rarefaction}
 seqtab %>%
@@ -633,7 +636,7 @@ ggsave("figures/fig_4a.pdf", width = 10, height = 10, units = "cm")
 
 ## Fig. 4b: Barplot mRNA
 
-Transform absolute counts to counts per million (cpm)
+Transform absolute counts to counts per million (cpm) which is the relative abundance within each sample.
 
 
 ```{r calculate cpm from raw counts}
@@ -751,6 +754,7 @@ seqcpm %>%
 ggsave("figures/barplot_superkingdom.pdf", height = 10, width = 14, units = "cm")
 ```
 
+
 ## Differential gene expression using EdgeR
 
 
@@ -823,7 +827,7 @@ diffexp %>%
   theme_tidy() + 
   theme(aspect.ratio = 3.0, 
         axis.text.y = element_text(size = 6),
-        panel.border = element_blank(), strip
+        panel.border = element_blank(),
         axis.line.y.left = element_line(),
         axis.line.x.bottom = element_line()) +
   scale_y_discrete(labels = function(x) str_wrap(x, width = 35))
@@ -879,6 +883,7 @@ seqcpm %>%
   theme(panel.border = element_blank(), axis.ticks.y = element_blank())
 ```
 
+
 ```{r export barplot edger significant DE}
 ggsave('figures/fig7.pdf', height = 20, width = 22, units = 'cm')
 ```
@@ -932,62 +937,39 @@ ggsave("figures/fig_5.png", height = 12, width = 22, units = "cm")
 ```
 
 
-### Pie chart Thiobacillus ###
-
-
-```{r}
-rnatab %>%
-  inner_join(ncbi, by = "geneid") %>%
-  select(sample, count, geneid) %>%
-  spread(sample, count, fill = 0) %>%
-  column_to_rownames('geneid') %>%
-  edgeR::DGEList(group = smd_metat$treat) %>% edgeR::cpm() %>%
-  as.data.frame() %>%
-  rownames_to_column('geneid') %>%
-  gather(sample, cpm , -1) %>% filter(cpm > 0) %>% 
-  as_tibble() -> seqcpm
-
-seqcpm %>% 
-  inner_join(ncbi, by = "geneid") %>% 
-  filter(genus == "Thiobacillus") %>% 
-  inner_join(smd_metat, by = "sample") %>%
-  inner_join(eggnogs, by = "geneid") %>%
-  group_by(eggnog, ref) %>% 
-  summarise(cpm = sum(cpm), .groups = "drop_last") %>%
-  summarise(mean_relab = sum(cpm), .groups = 'drop') %>%
-  top_n(10, mean_relab) -> t
-
-eggnogs %>%
-  left_join(t %>% transmute(eggnog, topnog = eggnog), by = "eggnog") %>%
-  replace_na(list("topnog" = "Other")) -> taxref
+```{r fungi}
+ncbi %>% 
+  filter(kingdom == "Fungi") %>% 
+  inner_join(seqcpm, by = "geneid") %>%
+  group_by(sample, taxon) %>% summarise(cpm = sum(cpm), .groups = "drop") %>%
+  ggplot(aes(x = cpm, 
+             y = fct_rev(fct_relevel(sample, c("P10152_S2","P10152_S3"))),
+             fill = taxon)) +
+  labs(x = 'Counts per million', y = '') +
+  geom_col() +
+  scale_fill_brewer(palette = 'Paired') +
+  coord_cartesian(clip = "off") +
+  scale_x_continuous(labels = function(x) format(x, scientific = TRUE)) +
+  theme_tidy() +
+  geom_text(aes(label = "TM planktonic", x = 8.25e3, y = 1), hjust = 0, size = 2.0) +
+  geom_text(aes(label = "MM planktonic", x = 8.25e3, y = 2.5), hjust = 0, size = 2.0) +
+  geom_text(aes(label = "TM biofilm", x = 8.25e3, y = 4.5), hjust = 0, size = 2.0) +
+  geom_text(aes(label = "MM biofilm", x = 8.25e3, y = 6.5), hjust = 0, size = 2.0) +
+  annotate(x = 8.2e3, xend = 8.2e3, y = 0.55, yend = 1.45, lwd = 0.5, geom = "segment") +
+  annotate(x = 8.2e3, xend = 8.2e3, y = 1.55, yend = 3.45, lwd = 0.5, geom = "segment") +
+  annotate(x = 8.2e3, xend = 8.2e3, y = 3.55, yend = 5.45, lwd = 0.5, geom = "segment") +
+  annotate(x = 8.2e3, xend = 8.2e3, y = 5.55, yend = 7.45, lwd = 0.5, geom = "segment") +
+  theme(panel.border = element_blank(),
+        legend.spacing.x = unit(0.5, "mm"),
+        legend.key.size = unit(4.0, "mm"),
+        axis.text.y = element_text(size = 6.0),
+        axis.ticks.y.left = element_line(),
+        axis.line.x.bottom = element_line(colour = "black"),
+        axis.line.y.left = element_line(colour = "black"))
+```
+```{r explot barplot eggnog}
+ggsave("figures/fungi.pdf", height = 12, width = 14, units = "cm")
+ggsave("figures/fungi.png", height = 12, width = 14, units = "cm")
 ```
 
 
-```{r barplot eggnog thiobacillus}
-smd_metat %>% mutate(ref = paste(nature, designation, sep = '\n')) -> smd_metat
-
-seqcpm %>%
-  inner_join(ncbi, by = "geneid") %>% filter(genus == "Thiobacillus") %>%
-  left_join(taxref, by = "geneid") %>%
-  replace_na(list("topnog" = "Unassigned")) %>%
-  # Combine water type and origin
-  inner_join(smd_metat, by = 'sample') %>%
-  # Summarize in order to have the sum for each category and topphylum
-  group_by(ref, topnog) %>% summarise(cpm = sum(cpm), .groups = "drop_last") %>%
-  #mutate(cpm = cpm / sum(cpm)) %>%
-  # Call plot
-  ggplot(aes(x = fct_relevel(ref, c('Biofilm\nTM-448.4','Planktonic\nTM-448.4')), 
-             y = cpm, 
-             fill = fct_relevel(topnog, c("Unassigned", 'Other')))) +
-  labs(x = '', y = 'Counts per million') + 
-  scale_y_continuous(labels = c("1.0e+6", "7.5e+5", "5.0e+5", "2.5e+5", "0.0"), trans = 'reverse') +
-  geom_col(width = 0.8) + 
-  scale_fill_brewer(palette = "Paired") +
-  coord_flip() + theme_barplot() + guides(fill = guide_legend(nrow = 6)) + 
-  theme(aspect.ratio = 0.6, legend.key.size = unit(4, 'mm'))
-```
-
-
-```{r export barplot mRNA eggnog}
-ggsave("figures/mrna_eggnog.pdf", height = 10, width = 16, units = "cm")
-```
