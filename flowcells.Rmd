@@ -1,6 +1,6 @@
 ---
 title: "Flowcells Äspö HRL"
-subtitle: "RaukR 2022 • Advanced R for Bioinformatics"
+subtitle: "Biofilm formation in deep biosphere at Äspö HRL"
 author: "George Westmeijer"
 output:
   bookdown::html_document2:
