@@ -1,8 +1,21 @@
 ---
-title: "flowcells_dna"
-author: "George"
-date: "20/12/2021"
-output: html_document
+---
+title: "Flowcells Äspö HRL"
+subtitle: "RaukR 2022 • Advanced R for Bioinformatics"
+author: "George Westmeijer"
+output:
+  bookdown::html_document2:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+    theme: spacelab
+    highlight: textmate
+    df_print: paged
+    code_folding: hide
+    self_contained: false
+    keep_md: false
+    encoding: "UTF-8"
 ---
 
 ```{r setup, include=FALSE}
@@ -22,7 +35,7 @@ theme_tidy <- function() {
     axis.title.y = element_text(colour = "black", size = 8),
     axis.text.x = element_text(colour = "black", size = 8),
     axis.text.y = element_text(colour = "black", size = 8),
-    axis.ticks.y = elelement_blank(),
+    axis.ticks.y = element_blank(),
     legend.text = element_text(colour = "black", size = 8),
     strip.background = element_blank(),
     strip.placement = "outside",
@@ -30,7 +43,6 @@ theme_tidy <- function() {
     panel.grid = element_blank(),
     legend.position = "bottom",
     aspect.ratio = 1.0,
-    plot.background = element_blank(),
     panel.background = element_blank(),
     panel.border = element_rect(colour = "black", size = 0.5, fill = NA),
     legend.title = element_blank(),
@@ -44,14 +56,13 @@ theme_barplot <- function() {
     axis.title.x = element_text(colour = "black", size = 8),
     axis.title.y = element_text(colour = "black", size = 8),
     axis.text.x = element_text(colour = "black", size = 8),
-    axis.text.y = element_text(colour = "black", size = 8, margin = margin(0,-5,0,0, unit = 'mm')),
+    axis.text.y = element_text(colour = "black", size = 8, margin = margin(0,-3,0,0, unit = 'mm')),
     legend.text = element_text(colour = "black", size = 8),
     strip.background = element_blank(),
     panel.grid = element_blank(),
     legend.position = "bottom",
     aspect.ratio = 0.7,
     strip.text = element_text(colour = "black", size = 8, hjust = 0.5),
-    plot.background = element_blank(),
     panel.background = element_blank(),
     legend.title = element_blank(),
     legend.box.background = element_blank(),
@@ -79,7 +90,7 @@ barplot <- function(asvs = seqtab, meta = smd, taxonomy = tax, taxlevel = "phylu
   # Calculate the mean abundance of each phylum over the categories
   summarise(mean_relab = sum(relab), .groups = 'drop') %>%
   filter(!is.na(phylum) & phylum != "uncultured bacterium") %>%
-  top_n(11, mean_relab) -> t
+  top_n(n, mean_relab) -> t
 
 taxonomy %>%
   left_join(t %>% transmute(phylum, topphylum = phylum), by = "phylum") %>%
@@ -103,7 +114,7 @@ asvs %>%
   # Calculate the mean abundance of each phylum over the categories
   summarise(mean_relab = sum(relab), .groups = 'drop') %>%
   filter(!is.na(class) & class != "uncultured bacterium") %>%
-  top_n(11, mean_relab) -> t
+  top_n(n, mean_relab) -> t
 
 taxonomy %>%
   left_join(t %>% transmute(class, topphylum = class), by = "class") %>%
@@ -116,6 +127,54 @@ asvs %>%
   group_by(topphylum, env) %>% 
   summarise(relab = sum(relab), .groups = 'drop') -> asvs.class
   return(asvs.class)
+  }
+  else if (taxlevel == "family") {
+  asvs %>%
+  inner_join(meta, by = 'sample') %>%
+  inner_join(taxonomy, by = "seqid") %>%
+  group_by(family, env) %>%
+  # Sum the abundance of each phylum within a sample
+  summarise(relab = sum(relab), .groups = 'drop_last') %>%
+  # Calculate the mean abundance of each phylum over the categories
+  summarise(mean_relab = sum(relab), .groups = 'drop') %>%
+  filter(!is.na(family) & family != "uncultured bacterium") %>%
+  top_n(n, mean_relab) -> t
+
+taxonomy %>%
+  left_join(t %>% transmute(family, topphylum = family), by = "family") %>%
+  replace_na(list("topphylum" = "Other")) -> taxref
+
+asvs %>%
+  inner_join(taxref, by = "seqid") %>% 
+  inner_join(meta, by = 'sample') %>%
+  # Summarize in order to have the sum for each category and topphylum
+  group_by(topphylum, env) %>% 
+  summarise(relab = sum(relab), .groups = 'drop') -> asvs.family
+  return(asvs.family)
+  }
+  else if (taxlevel == "genus") {
+  asvs %>%
+  inner_join(meta, by = 'sample') %>%
+  inner_join(taxonomy, by = "seqid") %>%
+  group_by(genus, env) %>%
+  # Sum the abundance of each phylum within a sample
+  summarise(relab = sum(relab), .groups = 'drop_last') %>%
+  # Calculate the mean abundance of each phylum over the categories
+  summarise(mean_relab = sum(relab), .groups = 'drop') %>%
+  filter(!is.na(genus) & genus != "uncultured bacterium" & genus != "uncultured") %>%
+  top_n(n, mean_relab) -> t
+
+taxonomy %>%
+  left_join(t %>% transmute(genus, topphylum = genus), by = "genus") %>%
+  replace_na(list("topphylum" = "Other")) -> taxref
+
+asvs %>%
+  inner_join(taxref, by = "seqid") %>% 
+  inner_join(meta, by = 'sample') %>%
+  # Summarize in order to have the sum for each category and topphylum
+  group_by(topphylum, env) %>% 
+  summarise(relab = sum(relab), .groups = 'drop') -> asvs.genus
+  return(asvs.genus)
   }
   else {
   asvs %>%
@@ -144,11 +203,16 @@ asvs %>%
 }
 ```
 
+
 ## Read files
+
 
 ```{r input files, message=FALSE, warning=FALSE}
 read_tsv('smd.tsv', col_types = cols(.default = col_character())) %>%
-  mutate(env = if_else(nature == "Planktonic", paste(nature, desig), paste(nature, desig, age))) -> smd
+  mutate(env = if_else(nature == "Planktonic", 
+                       paste(nature, desig), 
+                       paste(nature, desig, age))) %>%
+  group_by(env) %>% add_tally() %>% ungroup() -> smd
 
 read_tsv("taxonomy.tsv", col_types = cols(.default = col_character())) -> tax
 
@@ -182,29 +246,128 @@ vegan::rarecurve(seqtab_matrix, sample = ., step = 100, xlab = 'Sequencing depth
 seqtab %>%
   select(-relab) %>%
   spread(seqid, count, fill = 0) %>% column_to_rownames('sample') %>%
-  vegan::diversity() %>% as.data.frame() %>% gather(seqid, shannon, -1) %>%
+  vegan::diversity() %>% as.data.frame() %>% 
+  gather(seqid, shannon, -1) %>%
   rename(shannon = 1) %>%
   rownames_to_column('sample') %>%
-  inner_join(smd, by = "sample") %>%
-  group_by(nature, borehole, filter, age) %>% mutate(meandiv = mean(shannon)) %>% ungroup() %>%
-  arrange(env) -> adiv
+  inner_join(smd, by = "sample") -> adiv
 ```
+
 
 Plot alpha diversity
 
+
 ```{r plot adiv}
+return.n <- function(x) {return(data.frame(label = paste('n =', length(x)), y = max(x) + 0.65))}
+
+
 adiv %>%
   mutate(env = paste(nature, desig)) %>%
-  ggplot(aes(x = shannon, y = fct_relevel(env, c('Biofilm TM-448.4','Planktonic TM-448.4')))) + 
+  mutate(env = factor(env, levels = 
+                        c("Planktonic MM-171.3", "Biofilm MM-171.3", 
+                          "Planktonic TM-448.4", "Biofilm TM-448.4"))) %>%
+  ggplot(aes(x = shannon, y = fct_rev(env))) + 
   geom_boxplot() +
-  geom_jitter(width = 0.01, alpha = 0.4, height = 0.1) +
+  geom_jitter(width = 0.01, alpha = 0.7, height = 0.1, color = "black") +
+  stat_summary(fun.data = return.n, geom = "text",
+               size = 2.75,
+               fun = median, 
+               position = position_dodge(width = 0.75)) +
   labs(x = "Alpha diversity (Shannon index)", y = "") +
-  theme_tidy()
+  theme_tidy() +
+  scale_x_continuous(limits = c(1.5,6.5)) +
+  theme(panel.border = element_blank(),
+        axis.line.x = element_line(),
+        axis.line.y.left = element_line()) -> plot.adiv
 ```
 
+
 ```{r export adiv plot, message=FALSE, warning=FALSE}
-ggsave("figures/adiv_dna.pdf", width = 12, height = 10, units = "cm")
+ggsave("figures/fig_1a.pdf", width = 10, height = 8, units = "cm")
+ggsave("figures/fig_1a.png", width = 10, height = 8, units = "cm")
 ```
+
+
+##  Fig. 1b: PCA on Hellinger-transformed dataset DNA
+
+Statistics on beta diversity: PERMANOVA
+
+
+```{r permanova}
+smd %>% mutate(nature = paste(nature, desig)) %>% arrange(sample) -> df
+
+seqtab %>%
+  select(-relab) %>%
+  spread(seqid, count, fill = 0) %>%
+  column_to_rownames("sample") %>%
+  vegan::decostand(method = 'hellinger') %>%
+  pairwiseAdonis::pairwise.adonis(factors = df$nature, sim.method = 'euclidean')
+```
+
+
+Hellinger transform the absolute counts
+
+
+```{r run PCA}
+seqtab %>%
+  select(-relab) %>%
+  spread(seqid, count, fill = 0) %>%
+  column_to_rownames("sample") %>%
+  vegan::decostand(method = 'hellinger') %>%
+  rownames_to_column('sample') %>%
+  gather(seqid, hellinger, -1) %>%
+  filter(hellinger > 0) %>%
+  mutate(hellinger = as.numeric(hellinger)) %>%
+  spread(seqid, hellinger, fill = 0) %>%
+  column_to_rownames('sample') %>% 
+  vegan::rda() -> pca
+```
+
+
+```{r Extract PCA values}
+pca.samples <- pca$CA$u %>% data.frame() %>% tibble::rownames_to_column('sample')
+pca.geneid    <- pca$CA$v %>% data.frame() %>% tibble::rownames_to_column('seqid')
+pca.eigs    <- pca$CA$eig %>% data.frame() %>% tibble::rownames_to_column('pc') %>%
+  rename(eigval = 2) %>%
+  mutate(propexpl = eigval/sum(eigval))
+```
+
+
+```{r Plot PCA}
+pca.samples %>%
+  inner_join(smd, by = 'sample') %>%
+  mutate(age = if_else(nature == "Planktonic", "", age)) %>%
+  mutate(age = gsub('d', ' d', age)) %>%
+  ggplot(aes(x = PC1, y = PC2)) +
+  # Points for samples, coloured by nature
+  geom_point(aes(colour = nature, shape = desig), size = 3) +
+  # Labelled according to groundwater type
+  scale_color_grey() + 
+  geom_text(aes(label = age), size = 2.5, hjust = -0.5) +
+  xlab(sprintf("PC1 (%2.1f%% explained)", pca.eigs[1,3] * 100)) +
+  ylab(sprintf("PC2 (%2.1f%% explained)", pca.eigs[2,3] * 100)) +
+  theme_tidy() +
+  geom_vline(xintercept = 0, linetype = 'dotted') +
+  geom_hline(yintercept = 0, linetype = 'dotted') +
+  theme(legend.text = element_text(size = 8, colour = "black"),
+        legend.spacing.x = unit(0.0, "mm")) -> plot.pca
+```
+
+
+```{r cowplot fig. 1}
+cowplot::plot_grid(plot.adiv, 
+                   plot.pca,
+                   labels = c("a)", "b)"), label_size = 10, 
+                   label_fontface = "plain",
+                   label_x = c(0.33, 0.11), label_y = 0.96)
+```
+
+
+```{r export PCA}
+ggsave("figures/fig_1.pdf", width = 18, height = 12, units = "cm")
+ggsave("figures/fig_1.png", width = 18, height = 12, units = "cm")
+```
+
 
 ```{r statistics alpha diversity}
 suppressPackageStartupMessages(library(car))
@@ -220,22 +383,101 @@ aov(meandiv ~ paste(nature, desig), data = adiv) %>% summary()
 aov(meandiv ~ paste(nature, desig), data = adiv) %>% TukeyHSD()
 ```
 
+
 ## Bar plot DNA
 
+
 ```{r bar plot DNA phylum}
+cols <- c('Other' = '#A6CEE3', 'Actinobacteria' = '#569EA4', 'Alphaproteobacteria' = '#AADB84',
+'Bacteroidetes' = '#52AF43', 'Chloroflexi' = '#F88A89',
+'Deltaproteobacteria' = '#E73233', 'Epsilonproteobacteria' = '#fdbf6f',
+'Firmicutes' = '#fccde5', 'Gammaproteobacteria' = '#bc80bd', "Omnitrophicaeota" = '#3D3F99',
+'Patescibacteria' = '#ffff99', 'Spirochaetes' = '#b15928')
+
 barplot() %>%
+  mutate(topphylum = if_else(topphylum == "SAR324 clade(Marine group B)", "SAR324 clade", topphylum)) %>%
+  mutate(env = gsub('Planktonic ', '', env)) %>%
+  mutate(env = gsub('Biofilm ', '', env)) %>%
   # Call the plot
-  ggplot(aes(x = fct_rev(env), y = relab, fill = fct_relevel(topphylum, c("Other")))) +
+  ggplot(aes(x = fct_relevel(env, c('TM-448.4 75d', 'TM-448.4 40d', 'TM-448.4 20d',
+                                    'MM-171.3 75d', 'MM-171.3 40d', 'MM-171.3 20d',
+                                    'TM-448.4', 'MM-171.3')),
+             y = relab, 
+             fill = fct_relevel(topphylum, c("Other")))) +
   labs(x = '', y = 'Relative abundance') +
   geom_col() +
-  scale_fill_brewer(palette = 'Paired') +
+  scale_fill_manual(values = cols) +
   coord_flip() + 
   scale_y_continuous(trans = 'reverse', labels = c('1.0','0.75','0.50','0.25','0')) +
-  theme_barplot()
+  theme_barplot() +
+  guides(fill = guide_legend(nrow = 3))
 ```
 
+
 ```{r export barplot DNA phylum}
-ggsave("figures/barplot_phylum.pdf", height = 12, width = 16, units = "cm")
+ggsave("figures/fig_2_phylum.pdf", height = 12, width = 14, units = "cm")
+```
+
+
+```{r bar plot DNA order}
+my.pal <- colorRampPalette(RColorBrewer::brewer.pal(12, "Paired"))
+paired.pal <- my.pal(15)
+
+barplot(taxlevel = "order", n = 14) %>%
+  mutate(topphylum = if_else(topphylum == "SAR324 clade(Marine group B)", "SAR324 clade", topphylum)) %>%
+  mutate(topphylum = if_else(topphylum == "Candidatus Falkowbacteria", "Ca. Falkowbacteria", topphylum)) %>%
+  mutate(env = gsub('Planktonic ', '', env)) %>%
+  mutate(env = gsub('Biofilm ', '', env)) %>%
+  # Call the plot
+  ggplot(aes(x = fct_relevel(env, c('TM-448.4 75d', 'TM-448.4 40d', 'TM-448.4 20d',
+                                    'MM-171.3 75d', 'MM-171.3 40d', 'MM-171.3 20d',
+                                    'TM-448.4', 'MM-171.3')),
+             y = relab, 
+             fill = fct_relevel(topphylum, c("Other")))) +
+  labs(x = '', y = 'Relative abundance') +
+  geom_col(width = 0.9) +
+  scale_fill_manual(values = paired.pal) +
+  annotate('text', x = 5, y = 0.58, size = 2.5, label = "25% Thiobacillus") +
+  annotate('text', x = 4, y = 0.5, size = 2.5, label = "74% Thiobacillus") +
+  annotate('text', x = 3, y = 0.51, size = 2.5, label = "72% Thiobacillus") +
+  annotate('text', x = 2, y = 0.56, size = 2.5, label = "43% Thiobacillus") +
+  annotate('text', x = 1, y = 0.58, size = 2.5, label = "37% Thiobacillus") +
+  coord_flip() + 
+  scale_y_continuous(trans = 'reverse', labels = c('1.0','0.75','0.50','0.25','0')) +
+  theme_barplot() + 
+  guides(fill = guide_legend(nrow = 4)) + 
+  theme(legend.text = element_text(size = 7))
+```
+
+
+```{r export barplot DNA order}
+ggsave("figures/fig_2.pdf", height = 12, width = 14, units = "cm")
+```
+
+
+```{r bar plot DNA genus}
+my.pal <- colorRampPalette(RColorBrewer::brewer.pal(12, "Paired"))
+paired.pal <- my.pal(15)
+
+barplot(taxlevel = "genus", n = 14) %>%
+  mutate(topphylum = if_else(topphylum == "uncultured delta proteobacterium Sva0853", "Sva0853 clade", topphylum)) %>%
+  mutate(env = gsub('Planktonic ', '', env)) %>%
+  mutate(env = gsub('Biofilm ', '', env)) %>%
+  # Call the plot
+  ggplot(aes(x = fct_relevel(env, c('TM-448.4 75d', 'TM-448.4 40d', 'TM-448.4 20d',
+                                    'MM-171.3 75d', 'MM-171.3 40d', 'MM-171.3 20d',
+                                    'TM-448.4', 'MM-171.3')),
+             y = relab, 
+             fill = fct_relevel(topphylum, c("Other")))) +
+  labs(x = '', y = 'Relative abundance') +
+  geom_col() +
+  scale_fill_manual(values = paired.pal) +
+  coord_flip() + 
+  scale_y_continuous(trans = 'reverse', labels = c('1.0','0.75','0.50','0.25','0')) +
+  theme_barplot() + guides(fill = guide_legend(nrow = 4)) + theme(legend.text = element_text(size = 7))
+```
+```{r export barplot DNA genus}
+ggsave("figures/barplot_genus.pdf", height = 12, width = 14, units = "cm")
 ```
 
 
@@ -250,28 +492,10 @@ barplot(taxlevel = "class") %>%
   scale_y_continuous(trans = 'reverse', labels = c('1.0','0.75','0.50','0.25','0')) +
   theme_barplot()
 ```
+
+
 ```{r export barplot DNA class}
-ggsave("figures/barplot_class.pdf", height = 12, width = 16, units = "cm")
-```
-
-
-```{r bar plot DNA order}
-barplot(taxlevel = "order") %>%
-  mutate(topphylum = gsub("Candidatus", "Ca.", topphylum)) %>%
-  mutate(topphylum = gsub("Marine group B", "", topphylum)) %>%
-  mutate(topphylum = gsub("[()]", "", topphylum)) %>%
-  # Call the plot
-  ggplot(aes(x = fct_rev(env), y = relab, fill = fct_relevel(topphylum, c("Other")))) +
-  labs(x = '', y = 'Relative abundance') +
-  geom_col() +
-  scale_fill_brewer(palette = 'Paired') +
-  coord_flip() + 
-  scale_y_continuous(trans = 'reverse', labels = c('1.0','0.75','0.50','0.25','0')) +
-  theme_barplot()
-```
-
-```{r export barplot DNA order}
-ggsave("figures/barplot_order.pdf", height = 12, width = 16, units = "cm")
+ggsave("figures/barplot_class.pdf", height = 12, width = 14, units = "cm")
 ```
 
 
@@ -317,7 +541,7 @@ aldex %>%
 
 library(RColorBrewer)
 pheatmap::pheatmap(heatmap_matrix,
-                   filename = 'figures/heatmap_d.pdf',
+                   filename = 'figures/fig_3.pdf',
                    color = colorRampPalette(brewer.pal(8, "Blues"))(7),
                    legend_breaks = c(0, 0.1, 0.2, 0.3, max(heatmap_matrix)),
                    legend_labels = c('0', '0.1', '0.2', '0.3', 'Abundance'),
@@ -329,70 +553,6 @@ pheatmap::pheatmap(heatmap_matrix,
                    treeheight_row = 20,
                    clustering_distance_rows = 'euclidean',
                    legend = T)
-```
-
-## PCA on Hellinger-transformed dataset DNA
-
-Statistics on beta diversity: PERMANOVA
-
-```{r permanova}
-smd %>% mutate(nature = paste(nature, desig)) %>% arrange(sample) -> df
-
-seqtab %>%
-  select(-relab) %>%
-  spread(seqid, count, fill = 0) %>%
-  column_to_rownames("sample") %>%
-  vegan::decostand(method = 'hellinger') %>%
-  pairwiseAdonis::pairwise.adonis(factors = df$nature, sim.method = 'euclidean')
-```
-
-Transform the genecounts
-
-```{r run PCA}
-seqtab %>%
-  select(-relab) %>%
-  spread(seqid, count, fill = 0) %>%
-  column_to_rownames("sample") %>%
-  vegan::decostand(method = 'hellinger') %>%
-  rownames_to_column('sample') %>%
-  gather(seqid, hellinger, -1) %>%
-  filter(hellinger > 0) %>%
-  mutate(hellinger = as.numeric(hellinger)) %>%
-  spread(seqid, hellinger, fill = 0) %>%
-  column_to_rownames('sample') %>% vegan::rda() -> pca
-```
-
-
-```{r Extract PCA values}
-pca.samples <- pca$CA$u %>% data.frame() %>% tibble::rownames_to_column('sample')
-pca.geneid    <- pca$CA$v %>% data.frame() %>% tibble::rownames_to_column('seqid')
-pca.eigs    <- pca$CA$eig %>% data.frame() %>% tibble::rownames_to_column('pc') %>%
-  rename(eigval = 2) %>%
-  mutate(propexpl = eigval/sum(eigval))
-```
-
-
-```{r Plot PCA}
-pca.samples %>%
-  inner_join(smd, by = 'sample') %>%
-  ggplot(aes(x = PC1, y = PC2)) +
-  # Points for samples, coloured by nature
-  geom_point(aes(colour = nature, shape = desig), size = 5) +
-  # Labelled according to groundwater type
-  scale_color_grey() +
-  xlab(sprintf("PC1 (%2.1f%% explained)", pca.eigs[1,3] * 100)) +
-  ylab(sprintf("PC2 (%2.1f%% explained)", pca.eigs[2,3] * 100)) +
-  theme_tidy() +
-  geom_vline(xintercept = 0, linetype = 'dotted') +
-  geom_hline(yintercept = 0, linetype = 'dotted') +
-  theme(legend.position = c(0.85, 0.25),
-        legend.box.background = element_rect(color = 'black', size = 0.25),
-        legend.background = element_blank())
-```
-
-
-```{r export PCA}
-ggsave("figures/pca_dna.pdf", width = 12, height = 12, units = "cm")
 ```
 
 
@@ -422,9 +582,11 @@ read_tsv('taxa.tsv', col_types = cols(.default = col_character())) -> ncbi
 ```
 
 
-## PCA on Hellinger-transformed dataset RNA
+## Fig. 4a: PCA on Hellinger-transformed dataset
+
 
 Transform the genecounts
+
 
 ```{r run PCA RNA}
 rnatab %>%
@@ -450,24 +612,144 @@ pca.samples %>%
   inner_join(smd_metat, by = 'sample') %>%
   ggplot(aes(x = PC1, y = PC2)) +
   # Points for samples, coloured by nature
-  geom_point(aes(colour = nature, shape = designation), size = 5) +
+  geom_point(aes(colour = nature, shape = designation), size = 3) +
   scale_color_grey() +
   xlab(sprintf("PC1 (%2.1f%% explained)", pca.eigs[1,3] * 100)) +
   ylab(sprintf("PC2 (%2.1f%% explained)", pca.eigs[2,3] * 100)) +
-  theme_tidy() +
   geom_vline(xintercept = 0, linetype = 'dotted') +
   geom_hline(yintercept = 0, linetype = 'dotted') +
-  theme(legend.position = c(0.85, 0.25), 
-        legend.title = element_blank(), 
-        aspect.ratio = 1.2,
-        legend.box.background = element_rect(colour = "black", size = 0.5))
+  theme_tidy() +
+  theme(legend.position = c(0.80, 0.30),
+        legend.text = element_text(size = 8, colour = "black"),
+        legend.box.background = element_rect(color = 'black', size = 0.25),
+        legend.background = element_blank()) -> plot.pca
 ```
 
 
 ```{r export PCA RNA}
-ggsave("figures/fig4a.pdf", width = 10, height = 10, units = "cm")
+ggsave("figures/fig_4a.pdf", width = 10, height = 10, units = "cm")
 ```
 
+
+## Fig. 4b: Barplot mRNA
+
+Transform absolute counts to counts per million (cpm)
+
+
+```{r calculate cpm from raw counts}
+rnatab %>%
+  filter(geneid %in% ncbi$geneid) %>%
+  spread(sample, count, fill = 0) %>%
+  column_to_rownames('geneid') %>%
+  edgeR::DGEList(group = smd_metat$treat) %>% edgeR::cpm() %>%
+  as.data.frame() %>%
+  rownames_to_column('geneid') %>%
+  gather(sample, cpm , -1) %>% filter(cpm > 0) %>% 
+  as_tibble() -> seqcpm
+```
+
+
+```{r select 11 most abundant phyla RNA}
+seqcpm %>%
+  # Only use transcripts annotated on phylum level
+  inner_join(ncbi, by = "geneid") %>%
+  inner_join(smd_metat, by = "sample") %>%
+  group_by(phylum, ref) %>%
+  # Sum the abundance of each phylum within a category
+  summarise(cpm = sum(cpm), .groups = "drop_last") %>%
+  # Calculate the mean abundance of each phylum over the categories
+  summarise(mean_relab = sum(cpm), .groups = 'drop') %>%
+  filter(!is.na(phylum)) %>%
+  top_n(6, mean_relab) -> t
+
+ncbi %>%
+  left_join(t %>% transmute(phylum, topphylum = phylum), by = "phylum") %>%
+  mutate(topphylum = if_else(is.na(phylum), "Unidentified", topphylum)) %>%
+  mutate(topphylum = if_else(topphylum == "Proteobacteria", class, topphylum)) %>%
+  replace_na(list("topphylum" = "Other")) -> taxref
+```
+
+
+```{r barplot mRNA phylum level}
+smd_metat %>% mutate(ref = paste(nature, designation, sep = '\n')) -> smd_metat
+cols <- c('Other' = '#A6CEE3', 'Unidentified' = '#4992C2',
+'Alphaproteob.' = '#AADB84',
+'Bacteroidetes' = '#52AF43', 'Betaproteob.' = '#8A9D5B',
+'Deltaproteob.' = '#E73233', 'Epsilonproteob.' = '#fdbf6f',
+'Eukaryota' = '#FE870D', 'Euryarchaeota' = '#E19B78',
+'Firmicutes' = '#fccde5', 'Gammaproteob.' = '#bc80bd',
+'Tenericutes' = '#C7B699')
+
+seqcpm %>%
+  inner_join(taxref, by = "geneid") %>%
+  # Combine water type and origin
+  inner_join(smd_metat, by = 'sample') %>%
+  # Summarize in order to have the sum for each category and topphylum
+  group_by(ref, topphylum) %>% summarise(cpm = sum(cpm), .groups = "drop") %>%
+  mutate(topphylum = gsub("proteobacteria", "proteob.", topphylum)) %>%
+  # Call plot
+  ggplot(aes(x = fct_relevel(ref, c('Biofilm\nTM-448.4','Planktonic\nTM-448.4')), 
+             y = cpm, 
+             fill = fct_relevel(topphylum, c('Other', 'Unidentified')))) +
+  labs(x = '', y = 'Counts per million') + 
+  scale_y_continuous(labels = c("1e+6", "7.5e+5", "5.0e+5", "2.5e+5", "0.0"), trans = 'reverse') +
+  geom_col(width = 0.7) +
+  scale_fill_manual(values = cols) +
+  coord_flip() + 
+  annotate('text', x = 1, y = 700000, size = 2.5, label = "65% Thiobacillus") +
+  theme_barplot() + 
+  guides(fill = guide_legend(nrow = 4)) + 
+  theme(legend.key.size = unit(4, 'mm')) -> plot.phylum
+```
+
+
+```{r cowplot fig. 4}
+cowplot::plot_grid(plot.pca, 
+                   plot.phylum, 
+                   rel_widths = c(1.0, 1.2),
+                   labels = c("a)", "b)"), label_size = 10, 
+                   label_fontface = "plain",
+                   label_x = c(0.13, 0.19), label_y = 0.90)
+```
+
+
+
+```{r export barplot mRNA phylum}
+ggsave("figures/fig_4.pdf", height = 12, width = 18, units = "cm")
+ggsave("figures/fig_4.png", height = 12, width = 18, units = "cm")
+```
+
+
+Barplot superkingdom
+
+
+```{r barplot superkingdom}
+seqcpm %>%
+  inner_join(taxref, by = "geneid") %>%
+  # Combine water type and origin
+  inner_join(smd_metat, by = 'sample') %>%
+  #mutate(superkingdom = if_else(!is.na(superkingdom) & superkingdom == "Eukaryota" & genus == "Trichomonas", genus, superkingdom)) %>%
+  mutate(superkingdom = if_else(superkingdom == "Eukaryota", kingdom, superkingdom)) %>%
+  mutate(superkingdom = if_else(species == "Trichomonas vaginalis" & !is.na(species), species, superkingdom)) %>%
+  # Summarize in order to have the sum for each category and topphylum
+  group_by(ref, superkingdom) %>% summarise(cpm = sum(cpm), .groups = "drop") %>%
+  replace_na(list(superkingdom = "Unidentified")) %>%
+  # Call plot
+  ggplot(aes(x = fct_relevel(ref, c('Biofilm\nTM-448.4','Planktonic\nTM-448.4')), 
+             y = cpm, 
+             fill = fct_relevel(superkingdom, c("Unidentified")))) +
+  labs(x = '', y = 'Counts per million') + 
+  scale_y_continuous(labels = c("1.0e+6", "7.5e+5", "5.0e+5", "2.5e+5", "0.0"), trans = 'reverse') +
+  geom_col(width = 0.8) + 
+  scale_fill_brewer(palette = "Paired") +
+  coord_flip() + theme_barplot() + guides(fill = guide_legend(nrow = 1)) + 
+  theme(aspect.ratio = 0.6, legend.key.size = unit(4, 'mm'))
+```
+
+
+```{r export barplot mRNA superkingdom}
+ggsave("figures/barplot_superkingdom.pdf", height = 10, width = 14, units = "cm")
+```
 
 ## Differential gene expression using EdgeR
 
@@ -522,8 +804,12 @@ remove(de_mm, de_tm, de_mm_test, de_tm_test)
 ```
 
 
+Fig. 6 and 7: please organise the y-axis according to function by grouping these categories, e.g., into "biofilm formation", "motility", "energy conservation", "transporters", "biosynthesis"...
+
+
 ```{r violin plot DE significant}
 diffexp %>%
+  inner_join(ncbi, by = "geneid") %>%
   # Select significant DE genes
   filter(diffexp != 0) %>%
   # Set minimum data points
@@ -534,27 +820,21 @@ diffexp %>%
   geom_violin() +
   facet_wrap(~ aquifer, scales = "free_x") +
   geom_vline(xintercept = 0, linetype = 'dotted') +
-  theme_tidy() + theme(aspect.ratio = 3.0)
+  theme_tidy() + 
+  theme(aspect.ratio = 3.0, 
+        axis.text.y = element_text(size = 6),
+        panel.border = element_blank(), strip
+        axis.line.y.left = element_line(),
+        axis.line.x.bottom = element_line()) +
+  scale_y_discrete(labels = function(x) str_wrap(x, width = 35))
 ```
 
 
 ```{r export violin plot}
-ggsave('figures/fig6.pdf', height = 14, width = 18, units = 'cm')
+ggsave('figures/fig_6.pdf', height = 14, width = 18, units = 'cm')
 ```
 
 For the bar plot, the 11 most abundant taxonomic groups are selected (either phyla, classes or orders)
-
-```{r calculate cpm from raw counts}
-rnatab %>%
-  filter(geneid %in% ncbi$geneid) %>%
-  spread(sample, count, fill = 0) %>%
-  column_to_rownames('geneid') %>%
-  edgeR::DGEList(group = smd_metat$treat) %>% edgeR::cpm() %>%
-  as.data.frame() %>%
-  rownames_to_column('geneid') %>%
-  gather(sample, cpm , -1) %>% filter(cpm > 0) %>% 
-  as_tibble() -> seqcpm
-```
 
 
 ```{r select 11 most abundant DE orders}
@@ -603,55 +883,6 @@ seqcpm %>%
 ggsave('figures/fig7.pdf', height = 20, width = 22, units = 'cm')
 ```
 
-## Barplot mRNA
-
-```{r select 11 most abundant phyla RNA}
-ncbi <- ncbi %>% mutate(phylum = if_else(superkingdom == 'Eukaryota', superkingdom, phylum))
-
-seqcpm %>%
-  inner_join(ncbi, by = "geneid") %>%
-  mutate(phylum = if_else(phylum == "Proteobacteria", class, phylum)) %>%
-  group_by(phylum, sample) %>%
-  # Sum the abundance of each phylum within a category
-  summarise(cpm = sum(cpm)) %>%
-  # Calculate the mean abundance of each phylum over the categories
-  summarise(mean_relab = sum(cpm), .groups = 'drop') %>%
-  filter(!is.na(phylum)) %>%
-  top_n(11, mean_relab) -> t
-
-ncbi %>%
-  mutate(phylum = if_else(phylum == "Proteobacteria", class, phylum)) %>%
-  left_join(t %>% transmute(phylum, topphylum = phylum), by = "phylum") %>%
-  replace_na(list("topphylum" = "Other")) -> taxref
-```
-
-
-```{r barplot mRNA phylum level}
-smd_metat %>% mutate(ref = paste(nature, designation, sep = '\n')) -> smd_metat
-
-seqcpm %>%
-  left_join(taxref, by = "geneid") %>%
-  # Combine water type and origin
-  inner_join(smd_metat, by = 'sample') %>%
-  # Summarize in order to have the sum for each category and topphylum
-  group_by(ref, topphylum) %>% summarise(cpm = sum(cpm), .groups = "drop") %>%
-  replace_na(list(topphylum = 'Other')) %>%
-  # Call plot
-  ggplot(aes(x = fct_relevel(ref, c('Biofilm\nTM-448.4','Planktonic\nTM-448.4')), 
-             y = cpm, 
-             fill = fct_relevel(topphylum, c('Other')))) +
-  labs(x = '', y = 'Counts per million') + 
-  scale_y_continuous(labels = c("1.0e+6", "7.5e+5", "5.0e+5", "2.5e+5", "0.0"), trans = 'reverse') +
-  geom_col() +
-  scale_fill_brewer(palette = 'Paired') +
-  coord_flip() + theme_barplot()
-```
-
-
-```{r export barplot mRNA phylum}
-ggsave("figures/fig4b.pdf", height = 14, width = 14, units = "cm")
-```
-
 
 ```{r barplot biofilm order level eggnog}
 seqcpm %>%
@@ -659,7 +890,7 @@ seqcpm %>%
   inner_join(ncbi, by = "geneid") %>%
   group_by(order, sample) %>%
   # Sum the abundance of each phylum within a category
-  summarise(cpm = sum(cpm)) %>%
+  summarise(cpm = sum(cpm), .groups = "drop_last") %>%
   # Calculate the mean abundance of each phylum over the categories
   summarise(mean_relab = sum(cpm), .groups = 'drop') %>%
   filter(!is.na(order)) %>%
@@ -679,16 +910,84 @@ seqcpm %>%
              y = eggnog,
              fill = fct_relevel(topphylum, c('Other')))) +
   labs(x = 'Counts per million', y = '') +
-  facet_wrap(~ ref) +
+  facet_wrap(~ ref, labeller = label_wrap_gen(width = 40)) +
   geom_col() +
   scale_fill_brewer(palette = 'Paired') +
   scale_x_continuous(labels = function(x) format(x, scientific = TRUE)) +
   theme_tidy() + 
-  theme(panel.border = element_blank(), axis.ticks.y = element_blank())
+  scale_y_discrete(labels = function(x) str_wrap(x, width = 35)) +
+  theme(panel.border = element_blank(),
+        legend.spacing.x = unit(0.5, "mm"),
+        legend.key.size = unit(4.0, "mm"),
+        axis.text.y = element_text(size = 6.0),
+        axis.ticks.y.left = element_line(),
+        axis.line.x.bottom = element_line(colour = "black"),
+        axis.line.y.left = element_line(colour = "black"))
 ```
 
 
 ```{r explot barplot eggnog}
-ggsave("figures/fig5.pdf", height = 14, width = 24, units = "cm")
+ggsave("figures/fig_5.pdf", height = 12, width = 22, units = "cm")
+ggsave("figures/fig_5.png", height = 12, width = 22, units = "cm")
 ```
 
+
+### Pie chart Thiobacillus ###
+
+
+```{r}
+rnatab %>%
+  inner_join(ncbi, by = "geneid") %>%
+  select(sample, count, geneid) %>%
+  spread(sample, count, fill = 0) %>%
+  column_to_rownames('geneid') %>%
+  edgeR::DGEList(group = smd_metat$treat) %>% edgeR::cpm() %>%
+  as.data.frame() %>%
+  rownames_to_column('geneid') %>%
+  gather(sample, cpm , -1) %>% filter(cpm > 0) %>% 
+  as_tibble() -> seqcpm
+
+seqcpm %>% 
+  inner_join(ncbi, by = "geneid") %>% 
+  filter(genus == "Thiobacillus") %>% 
+  inner_join(smd_metat, by = "sample") %>%
+  inner_join(eggnogs, by = "geneid") %>%
+  group_by(eggnog, ref) %>% 
+  summarise(cpm = sum(cpm), .groups = "drop_last") %>%
+  summarise(mean_relab = sum(cpm), .groups = 'drop') %>%
+  top_n(10, mean_relab) -> t
+
+eggnogs %>%
+  left_join(t %>% transmute(eggnog, topnog = eggnog), by = "eggnog") %>%
+  replace_na(list("topnog" = "Other")) -> taxref
+```
+
+
+```{r barplot eggnog thiobacillus}
+smd_metat %>% mutate(ref = paste(nature, designation, sep = '\n')) -> smd_metat
+
+seqcpm %>%
+  inner_join(ncbi, by = "geneid") %>% filter(genus == "Thiobacillus") %>%
+  left_join(taxref, by = "geneid") %>%
+  replace_na(list("topnog" = "Unassigned")) %>%
+  # Combine water type and origin
+  inner_join(smd_metat, by = 'sample') %>%
+  # Summarize in order to have the sum for each category and topphylum
+  group_by(ref, topnog) %>% summarise(cpm = sum(cpm), .groups = "drop_last") %>%
+  #mutate(cpm = cpm / sum(cpm)) %>%
+  # Call plot
+  ggplot(aes(x = fct_relevel(ref, c('Biofilm\nTM-448.4','Planktonic\nTM-448.4')), 
+             y = cpm, 
+             fill = fct_relevel(topnog, c("Unassigned", 'Other')))) +
+  labs(x = '', y = 'Counts per million') + 
+  scale_y_continuous(labels = c("1.0e+6", "7.5e+5", "5.0e+5", "2.5e+5", "0.0"), trans = 'reverse') +
+  geom_col(width = 0.8) + 
+  scale_fill_brewer(palette = "Paired") +
+  coord_flip() + theme_barplot() + guides(fill = guide_legend(nrow = 6)) + 
+  theme(aspect.ratio = 0.6, legend.key.size = unit(4, 'mm'))
+```
+
+
+```{r export barplot mRNA eggnog}
+ggsave("figures/mrna_eggnog.pdf", height = 10, width = 16, units = "cm")
+```
