@@ -257,6 +257,21 @@ seqtab %>%
 ```
 
 
+```{r statistics alpha diversity}
+suppressPackageStartupMessages(library(car))
+# Normality of the data (null hypothesis data is normally distributed)
+shapiro.test(adiv$shannon)
+# Preferably all the dots on the diagonal
+qqPlot(adiv$shannon)
+# Homogeneity of variance using Levene (null hypothesis variance is equal)
+leveneTest(shannon ~ paste(nature, desig), data = adiv)
+# Run ANOVA (null hypothesis diversity is equal)
+aov(shannon ~ paste(nature, desig), data = adiv) %>% summary()
+# Post-hoc
+aov(shannon ~ paste(nature, desig), data = adiv) %>% TukeyHSD()
+```
+
+
 Plot alpha diversity
 
 
@@ -369,21 +384,6 @@ cowplot::plot_grid(plot.adiv,
 ```{r export PCA}
 ggsave("figures/fig_1.pdf", width = 18, height = 12, units = "cm")
 ggsave("figures/fig_1.png", width = 18, height = 12, units = "cm")
-```
-
-
-```{r statistics alpha diversity}
-suppressPackageStartupMessages(library(car))
-# Normality of the data (null hypothesis data is normally distributed)
-shapiro.test(adiv$meandiv)
-# Preferably all the dots on the diagonal
-qqPlot(adiv$meandiv)
-# Homogeneity of variance using Levene (null hypothesis variance is equal)
-leveneTest(meandiv ~ paste(nature, desig), data = adiv)
-# Run ANOVA (null hypothesis diversity is equal)
-aov(meandiv ~ paste(nature, desig), data = adiv) %>% summary()
-# Post-hoc
-aov(meandiv ~ paste(nature, desig), data = adiv) %>% TukeyHSD()
 ```
 
 
@@ -931,7 +931,7 @@ seqcpm %>%
 ```
 
 
-```{r explot barplot eggnog}
+```{r export barplot eggnog}
 ggsave("figures/fig_5.pdf", height = 12, width = 22, units = "cm")
 ggsave("figures/fig_5.png", height = 12, width = 22, units = "cm")
 ```
@@ -967,7 +967,7 @@ ncbi %>%
         axis.line.x.bottom = element_line(colour = "black"),
         axis.line.y.left = element_line(colour = "black"))
 ```
-```{r explot barplot eggnog}
+```{r export barplot fungi}
 ggsave("figures/fungi.pdf", height = 12, width = 14, units = "cm")
 ggsave("figures/fungi.png", height = 12, width = 14, units = "cm")
 ```
