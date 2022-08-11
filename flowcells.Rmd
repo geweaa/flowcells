@@ -33,136 +33,6 @@ source("/Users/geweaa/Box Sync/Protocols/theme.R")
 source("/Users/geweaa/Box Sync/Protocols/barplot.R")
 ```
 
-
-```{r barplot function}
-barplot <- function(asvs = seqtab, meta = smd, taxonomy = tax, taxlevel = "phylum", n = 11) {
-  if (taxlevel == "phylum") {
-    taxonomy <- taxonomy %>% mutate(phylum = if_else(phylum == "Proteobacteria", class, phylum))
-  asvs %>%
-  inner_join(meta, by = 'sample') %>%
-  inner_join(taxonomy, by = "seqid") %>%
-  group_by(phylum, env) %>%
-  # Sum the abundance of each phylum within a sample
-  summarise(relab = sum(relab), .groups = 'drop_last') %>%
-  # Calculate the mean abundance of each phylum over the categories
-  summarise(mean_relab = sum(relab), .groups = 'drop') %>%
-  filter(!is.na(phylum) & phylum != "uncultured bacterium") %>%
-  top_n(n, mean_relab) -> t
-
-taxonomy %>%
-  left_join(t %>% transmute(phylum, topphylum = phylum), by = "phylum") %>%
-  replace_na(list("topphylum" = "Other")) -> taxref
-
-asvs %>%
-  inner_join(taxref, by = "seqid") %>% 
-  inner_join(meta, by = 'sample') %>%
-  # Summarize in order to have the sum for each category and topphylum
-  mutate(env = paste(designation,age)) %>%
-  group_by(topphylum, env) %>% 
-  summarise(relab = sum(relab), .groups = 'drop') -> asvs.phylum
-  return(asvs.phylum)
-  }
-  else if (taxlevel == "class") {
-  asvs %>%
-  inner_join(meta, by = 'sample') %>%
-  inner_join(taxonomy, by = "seqid") %>%
-  group_by(class, env) %>%
-  # Sum the abundance of each phylum within a sample
-  summarise(relab = sum(relab), .groups = 'drop_last') %>%
-  # Calculate the mean abundance of each phylum over the categories
-  summarise(mean_relab = sum(relab), .groups = 'drop') %>%
-  filter(!is.na(class) & class != "uncultured bacterium") %>%
-  top_n(n, mean_relab) -> t
-
-taxonomy %>%
-  left_join(t %>% transmute(class, topphylum = class), by = "class") %>%
-  replace_na(list("topphylum" = "Other")) -> taxref
-
-asvs %>%
-  inner_join(taxref, by = "seqid") %>% 
-  inner_join(meta, by = 'sample') %>%
-  # Summarize in order to have the sum for each category and topphylum
-  group_by(topphylum, env) %>% 
-  summarise(relab = sum(relab), .groups = 'drop') -> asvs.class
-  return(asvs.class)
-  }
-  else if (taxlevel == "family") {
-  asvs %>%
-  inner_join(meta, by = 'sample') %>%
-  inner_join(taxonomy, by = "seqid") %>%
-  group_by(family, env) %>%
-  # Sum the abundance of each phylum within a sample
-  summarise(relab = sum(relab), .groups = 'drop_last') %>%
-  # Calculate the mean abundance of each phylum over the categories
-  summarise(mean_relab = sum(relab), .groups = 'drop') %>%
-  filter(!is.na(family) & family != "uncultured bacterium") %>%
-  top_n(n, mean_relab) -> t
-
-taxonomy %>%
-  left_join(t %>% transmute(family, topphylum = family), by = "family") %>%
-  replace_na(list("topphylum" = "Other")) -> taxref
-
-asvs %>%
-  inner_join(taxref, by = "seqid") %>% 
-  inner_join(meta, by = 'sample') %>%
-  # Summarize in order to have the sum for each category and topphylum
-  group_by(topphylum, env) %>% 
-  summarise(relab = sum(relab), .groups = 'drop') -> asvs.family
-  return(asvs.family)
-  }
-  else if (taxlevel == "genus") {
-  asvs %>%
-  inner_join(meta, by = 'sample') %>%
-  inner_join(taxonomy, by = "seqid") %>%
-  group_by(genus, env) %>%
-  # Sum the abundance of each phylum within a sample
-  summarise(relab = sum(relab), .groups = 'drop_last') %>%
-  # Calculate the mean abundance of each phylum over the categories
-  summarise(mean_relab = sum(relab), .groups = 'drop') %>%
-  filter(!is.na(genus) & genus != "uncultured bacterium" & genus != "uncultured") %>%
-  top_n(n, mean_relab) -> t
-
-taxonomy %>%
-  left_join(t %>% transmute(genus, topphylum = genus), by = "genus") %>%
-  replace_na(list("topphylum" = "Other")) -> taxref
-
-asvs %>%
-  inner_join(taxref, by = "seqid") %>% 
-  inner_join(meta, by = 'sample') %>%
-  # Summarize in order to have the sum for each category and topphylum
-  group_by(topphylum, env) %>% 
-  summarise(relab = sum(relab), .groups = 'drop') -> asvs.genus
-  return(asvs.genus)
-  }
-  else {
-  asvs %>%
-  inner_join(meta, by = 'sample') %>%
-  inner_join(taxonomy, by = "seqid") %>%
-  group_by(order, sample) %>%
-  # Sum the abundance of each phylum within a sample
-  summarise(relab = sum(relab), .groups = 'drop_last') %>%
-  # Calculate the mean abundance of each phylum over the categories
-  summarise(mean_relab = sum(relab), .groups = 'drop') %>%
-  filter(!is.na(order) & !grepl(pattern = "uncultured", x = order)) %>%
-  top_n(n, mean_relab) -> t
-
-taxonomy %>%
-  left_join(t %>% transmute(order, topphylum = order), by = "order") %>%
-  replace_na(list("topphylum" = "Other")) -> taxref
-
-asvs %>%
-  inner_join(taxref, by = "seqid") %>% 
-  inner_join(meta, by = 'sample') %>%
-  mutate(env = paste(designation,age)) %>%
-  # Summarize in order to have the sum for each category and topphylum
-  group_by(topphylum, env) %>% 
-  summarise(relab = sum(relab), .groups = 'drop') -> asvs.order
-  return(asvs.order)
-  }
-}
-```
-
-
 ## Read files
 
 
@@ -243,7 +113,6 @@ Plot alpha diversity
 ```{r plot adiv}
 return.n <- function(x) {return(data.frame(label = paste('n =', length(x)), y = max(x) + 0.65))}
 
-
 adiv %>%
   mutate(env = gsub(" ", " \n", env)) %>%
   ggplot(aes(x = shannon, y = fct_rev(env))) + 
@@ -256,7 +125,8 @@ adiv %>%
   labs(x = "Alpha diversity (Shannon index)", y = "") +
   scale_x_continuous(limits = c(1,6), expand = c(0.002,0)) +
   theme_clean() +
-  theme(plot.tag.position = c(.2,.99))  -> a
+  theme(plot.tag.position = c(.2,.99),
+        axis.text.y.left = element_text(face = "plain"))  -> a
 ```
 
 
@@ -301,7 +171,7 @@ pca.samples %>%
   geom_point(aes(colour = nature, shape = designation), size = 3) +
   # Labelled according to groundwater type
   scale_color_grey() + 
-  geom_text(aes(label = age), size = 2.5, hjust = -0.5) +
+  geom_text(aes(label = age), size = 6/.pt, hjust = -0.5) +
   xlab(sprintf("PC1 (%2.1f%% explained)", pca.eigs[1,3] * 100)) +
   ylab(sprintf("PC2 (%2.1f%% explained)", pca.eigs[2,3] * 100)) +
   geom_vline(xintercept = 0, linetype = 'dotted') +
