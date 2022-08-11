@@ -533,7 +533,7 @@ pca.samples %>%
   geom_vline(xintercept = 0, linetype = 'dotted') +
   geom_hline(yintercept = 0, linetype = 'dotted') +
   theme_tidy() +
-  theme(legend.spacing.x = unit(-0.2, "mm")) -> a
+  theme(legend.spacing.x = unit(-0.5, "mm")) -> a
 ```
 
 ## Fig. 4b: Barplot mRNA
@@ -611,6 +611,7 @@ seqcpm %>%
 
 
 ```{r Fig. 4}
+library(patchwork)
 a + b + plot_annotation(tag_levels = "a", tag_suffix = ")") &
   theme(plot.tag = element_text(size = 8, color = "black"))
 ```
