@@ -533,7 +533,7 @@ pca.samples %>%
   geom_vline(xintercept = 0, linetype = 'dotted') +
   geom_hline(yintercept = 0, linetype = 'dotted') +
   theme_tidy() +
-  theme(legend.spacing.x = unit(0, "mm")) -> a
+  theme(legend.spacing.x = unit(-0.2, "mm")) -> a
 ```
 
 ## Fig. 4b: Barplot mRNA
