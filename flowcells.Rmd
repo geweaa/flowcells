@@ -47,7 +47,10 @@ read_tsv('smd.tsv', col_types = cols(.default = col_character(),
                                      )
          ) -> smd
 
-read_tsv("taxonomy.tsv", col_types = cols(.default = col_character())) -> tax
+read_tsv("taxonomy.tsv", col_types = cols(.default = col_character())) %>%
+  mutate(order = if_else(order == "Betaproteobacteriales","Nitrosomonadales",order)) %>%
+  mutate(family = if_else(family == "Hydrogenophilaceae","Thiobacillaceae",family)) %>%
+  mutate(order = if_else(family == "Burkholderiaceae","Burkholderiales",order))-> tax
 
 read_tsv('seqtab.tsv', col_types = cols(.default = col_character(), count = col_integer())) %>%
   # Filter out samples with less than 1000 reads
@@ -243,14 +246,14 @@ barplot() %>%
   annotate('text', x = 7.5, y = -0.03, size = 6 / .pt, label = "Planktonic", angle = 90, hjust = 0.5) +
   coord_flip() + 
   scale_y_continuous(trans = 'reverse', labels = c('100','75','50','25','0')) +
-  theme_barplot() + 
+  theme_barplot(ratio = 1.4) + theme(legend.position = "right") #+
   guides(fill = guide_legend(nrow = 3))
 ```
 
 
 ```{r export barplot DNA phylum}
-ggsave("figures/fig_sx.pdf", height = 10, width = 14, units = "cm")
-ggsave("figures/fig_sx.png", height = 10, width = 14, units = "cm")
+ggsave("figures/fig_sx.pdf", height = 10, width = 12, units = "cm")
+ggsave("figures/fig_sx.png", height = 10, width = 12, units = "cm")
 ```
 
 
@@ -272,11 +275,11 @@ seqtab %>%
   geom_segment(aes(xend = env, y = 0, yend = relab), color = "black", size = 0.1) +
   geom_point(stroke = 0.8, size = 1, fill = "white", shape = 21) +
   geom_label(aes(label = genus, hjust = hjust), 
-            color = "black", fontface = "plain", size = 2, label.size = 0.1, label.padding = unit(0.10, "lines")) +
+            color = "black", fontface = "plain", size = 1.8, label.size = 0.1, label.padding = unit(0.10, "lines")) +
   coord_flip() +
-  scale_y_continuous(expand = c(0.002,0), limits = c(0,100), breaks = c(0,50,100), labels = c("0","50","100")) +
+  scale_y_continuous(expand = c(0.004,0), limits = c(0,100), breaks = c(0,50,100), labels = c("0","50","100")) +
   labs(x = "", y = "Relative abundance (%)") +
-  theme_clean(ratio = 1.8) +
+  theme_clean(ratio = 2) +
   theme(panel.grid.major.x = element_line(colour = "grey", linetype = "dotted", size = 0.4),
         panel.grid.major.y = element_blank(),
         plot.margin = margin(4,8,4,0),
@@ -285,8 +288,10 @@ seqtab %>%
 
 
 ```{r bar plot DNA order}
-#my.pal <- colorRampPalette(RColorBrewer::brewer.pal(12, "Paired"))
-#paired.pal <- my.pal(15)
+cols <- c("Other" = "#a6cee3", "Burkholderiales" = "#1f78b4", "Ca. Falkowbacteria" = "#b2df8a",
+          "Campylobacterales" = "#33a02c", "Caulobacterales" = "#fb9a99", "Desulfobacterales" = "#e31a1c",
+          "Nitrosomonadales" = "#fdbf6f", "Pseudomonadales" = "#ff7f00", "Rhizobiales" = "#cab2d6",
+          "SAR324 clade" = "#6a3d9a", "Spirochaetales" = "#ffff99")
 
 barplot(taxlevel = "order", n = 11) %>%
   mutate(topphylum = if_else(topphylum == "SAR324 clade(Marine group B)", "SAR324 clade", topphylum)) %>%
@@ -299,7 +304,7 @@ barplot(taxlevel = "order", n = 11) %>%
              fill = fct_relevel(topphylum, c("Other")))) +
   labs(x = '', y = 'Relative abundance (%)') +
   geom_col(width = 0.9) +
-  scale_fill_brewer(palette = "Paired") +
+  scale_fill_manual(values = cols) +
   #scale_fill_manual(values = paired.pal) +
   #annotate('text', x = 5, y = 0.58, size = 6 / .pt, label = "25% Thiobacillus") +
   #annotate('text', x = 4, y = 0.5, size = 6 / .pt, label = "74% Thiobacillus") +
@@ -308,11 +313,11 @@ barplot(taxlevel = "order", n = 11) %>%
   #annotate('text', x = 1, y = 0.58, size = 6 / .pt, label = "37% Thiobacillus") +
   annotate(geom = "segment", x = .55, xend = 6.45, y = -.01, yend = -.01) +
   annotate(geom = "segment", x = 6.55, xend = 8.45, y = -.01, yend = -.01) +
-  annotate('text', x = 3.5, y = -0.03, size = 6 / .pt, label = "Biofilm", angle = 90, hjust = 0.5) +
-  annotate('text', x = 7.5, y = -0.03, size = 6 / .pt, label = "Planktonic", angle = 90, hjust = 0.5) +
+  annotate('text', x = 3.5, y = -0.04, size = 6 / .pt, label = "Biofilm", angle = 90, hjust = 0.5) +
+  annotate('text', x = 7.5, y = -0.04, size = 6 / .pt, label = "Planktonic", angle = 90, hjust = 0.5) +
   coord_flip() + 
   scale_y_continuous(trans = 'reverse', labels = c('100','75','50','25','0')) + 
-  theme_barplot(ratio = 1) + 
+  theme_barplot(ratio = 1.5) + 
   theme(legend.key.size = unit(3.5, "mm"), 
         axis.text.y = element_blank(),
         plot.margin = margin(4,0,4,0),
@@ -321,75 +326,61 @@ barplot(taxlevel = "order", n = 11) %>%
 ```
 
 
+```{r Venn}
+library(ggvenn)
+
+seqtab %>% 
+  inner_join(smd, by = "sample") %>% 
+  group_by(nature,seqid) %>% 
+  summarise(count = sum(count)) %>% 
+  mutate(relab = count / sum(count)) %>% ungroup() -> i
+
+i %>% 
+  filter(seqid %in% biofilm & seqid %in% planktonic) %>% 
+  filter(nature == "Planktonic") %>% pull(relab) %>% sum()
+
+seqtab %>% inner_join(smd, by = "sample") %>% 
+  filter(nature == "Planktonic") %>%
+  pull(seqid) %>% unique() -> planktonic
+
+seqtab %>% inner_join(smd, by = "sample") %>% 
+  filter(nature == "Biofilm") %>%
+  pull(seqid) %>% unique() -> biofilm
+
+seqtab %>%
+  select(seqid) %>%
+  distinct() %>%
+  mutate(Biofilm = if_else(seqid %in% biofilm, TRUE,FALSE)) %>%
+  mutate(Planktonic = if_else(seqid %in% planktonic, TRUE,FALSE)) %>%
+  ggplot(aes(A = Biofilm, B = Planktonic)) +
+  geom_venn(
+    show_percentage = FALSE,
+    fill_color = c("#2171b5","#c6dbef"),
+    fill_alpha = .7,
+    set_name_size = 6/.pt, text_size = 6/.pt,
+    stroke_size = .5) + 
+  annotate(geom = "text", x = -0.75, y = -.2, label = "(84%)", size = 6/.pt) +
+  annotate(geom = "text", x = .8, y = -.2, label = "(80%)", size = 6/.pt) +
+  coord_fixed(expand = FALSE) +
+  theme_void() + 
+  theme(aspect.ratio = 1, plot.tag.position = c(.1,1.02),
+        plot.margin = margin(0,0,0,0)) -> c
+```
+
+
 ```{r Fig. 2}
 library(patchwork)
-a + b +
-  plot_layout(widths = c(1,1.8)) +
-  plot_annotation(tag_levels = "a", tag_suffix = ")") &
-  theme(plot.tag = element_text(size = 8, color = "black"))
+
+a + b + c + 
+  plot_annotation(tag_levels = "a", tag_suffix = ")") +
+  plot_layout(nrow = 1, widths = c(1.4,2,1.5)) &
+  theme(plot.tag = element_text(size = 8, color = "black"), plot.tag.position = "top")
 ```
 
 
 ```{r export Fig. 2}
 ggsave("figures/fig_2.pdf", height = 10, width = 14, units = "cm")
 ggsave("figures/fig_2.png", height = 10, width = 14, units = "cm")
-```
-
-
-## Differential abundance and heatmap
-
-
-```{r ALDEx2 analysis for differential ASV abundance, message=FALSE, warning=FALSE}
-seqtab %>%
-  # Filter out very low abundant ASVs
-  group_by(seqid) %>% filter(count > 10) %>% ungroup() %>%
-  select(-relab) %>% spread(sample, count, fill = 0) %>%
-  column_to_rownames('seqid') %>%
-  ALDEx2::aldex(conditions = smd %>% arrange(sample) %>% pull(nature)) %>%
-  rownames_to_column("seqid") %>%
-  inner_join(tax) -> aldex
-```
-
-
-```{r pheatmap}
-aldex %>%
-  slice_max(rab.win.Biofilm, n = 25) %>%
-  # Mutate taxonomies that only say 'uncultured'
-  mutate(across(c(class, order, family, genus, species), ~na_if(., 'uncultured bacterium'))) %>%
-  mutate(across(c(class, order, family, genus, species), ~na_if(., 'uncultured'))) %>%
-  mutate(across(c(class, order, family, genus, species), ~na_if(., 'uncultured organism'))) %>%
-  # Create a label based on the highest taxonomic level
-  mutate(label = coalesce(genus, family, order, class, phylum, domain)) %>%
-  # Add a unique ASV labl
-  mutate(label = paste("ASV", sprintf('%02d', row_number()), label)) %>%
-  select(label, seqid) %>%
-  # Join with seqtab to obtain abundance per sample
-  inner_join(seqtab, by = 'seqid') %>%
-  # Join with metadata to add categories
-  inner_join(smd, by = 'sample') %>%
-  select(label, env, relab) %>%
-  # Sum abundance within each grouping
-  group_by(env, label) %>% summarise(relab = sum(relab), .groups = "drop") %>%
-  # Transform abundance
-  mutate(relab = sqrt(relab)) %>%
-  spread(env, relab, fill = 0) %>% column_to_rownames('label') %>%
-  # Convert to a matrix
-  as.matrix() -> heatmap_matrix
-
-library(RColorBrewer)
-pheatmap::pheatmap(heatmap_matrix,
-                   filename = 'figures/fig_3.pdf',
-                   color = colorRampPalette(brewer.pal(8, "Blues"))(7),
-                   legend_breaks = c(0, 0.1, 0.2, 0.3, max(heatmap_matrix)),
-                   legend_labels = c('0', '0.1', '0.2', '0.3', 'Abundance'),
-                   breaks = c(0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35),
-                   border_color = '#d9d9d9', fontsize = 8,
-                   cellwidth = 15, cellheight = 15,
-                   scale = 'none', 
-                   cluster_rows = T, cluster_cols = F, 
-                   treeheight_row = 20,
-                   clustering_distance_rows = 'euclidean',
-                   legend = T)
 ```
 
 
@@ -409,7 +400,10 @@ read_tsv('prokka.tsv') %>% rename(geneid = locus_tag) -> prokka
 read_tsv('eggnogs.tsv', col_types = cols(.default = col_character())) -> eggnogs
 
 # Read sample metadata
-smd %>% filter(is.na(age)) %>% select(-age) -> smd
+smd %>% 
+  filter(is.na(age)) %>% 
+  select(-age) %>%
+  mutate(treat = factor(treat, levels = c("A","B","C","D")))-> smd
 
 # Taxonomy (NCBI)
 read_tsv('taxa.tsv', col_types = cols(.default = col_character())) -> ncbi
@@ -544,45 +538,19 @@ ggsave("figures/fig_4.png", height = 10, width = 16, units = "cm")
 ```
 
 
-Barplot superkingdom
-
-
-```{r barplot superkingdom}
-seqcpm %>%
-  inner_join(taxref, by = "geneid") %>%
-  # Combine water type and origin
-  inner_join(smd_metat, by = 'sample') %>%
-  #mutate(superkingdom = if_else(!is.na(superkingdom) & superkingdom == "Eukaryota" & genus == "Trichomonas", genus, superkingdom)) %>%
-  mutate(superkingdom = if_else(superkingdom == "Eukaryota", kingdom, superkingdom)) %>%
-  mutate(superkingdom = if_else(species == "Trichomonas vaginalis" & !is.na(species), species, superkingdom)) %>%
-  # Summarize in order to have the sum for each category and topphylum
-  group_by(ref, superkingdom) %>% summarise(cpm = sum(cpm), .groups = "drop") %>%
-  replace_na(list(superkingdom = "Unidentified")) %>%
-  # Call plot
-  ggplot(aes(x = fct_relevel(ref, c('Biofilm\nTM-448.4','Planktonic\nTM-448.4')), 
-             y = cpm, 
-             fill = fct_relevel(superkingdom, c("Unidentified")))) +
-  labs(x = '', y = 'Counts per million') + 
-  scale_y_continuous(labels = c("1.0e+6", "7.5e+5", "5.0e+5", "2.5e+5", "0.0"), trans = 'reverse') +
-  geom_col(width = 0.8) + 
-  scale_fill_brewer(palette = "Paired") +
-  coord_flip() + theme_barplot() + guides(fill = guide_legend(nrow = 1)) + 
-  theme(aspect.ratio = 0.6, legend.key.size = unit(4, 'mm'))
-```
-
-
-```{r export barplot mRNA superkingdom}
-ggsave("figures/barplot_superkingdom.pdf", height = 10, width = 14, units = "cm")
-```
-
-
-```{r barplot biofilm order level eggnog}
+```{r Fig. 5 barplot biofilm order level eggnog}
 i <- c("Translation, ribosomal structure and biogenesis","Cell wall/membrane/envelope biogenesis",
        "Energy production and conversion","Signal transduction mechanisms",
        "Cell motility","Amino acid transport and metabolism",
        "Replication, recombination and repair","Carbohydrate transport and metabolism",
        "Lipid transport and metabolism","Nucleotide transport and metabolism",
        "Defense mechanisms","RNA processing and modification")
+
+cols <- c("Other" = "#a6cee3", "Burkholderiales" = "#1f78b4",
+          "Campylobacterales" = "#33a02c", "Chromatiales" = "#fb9a99", "Desulfobacterales" = "#e31a1c",
+          "Desulfovibrionales" = "grey",
+          "Nitrosomonadales" = "#fdbf6f", "Pseudomonadales" = "#ff7f00", "Rhizobiales" = "#cab2d6",
+          "Rhodocyclales" = "#6a3d9a", "Sphingomonadales" = "#ffff99")
 
 seqcpm %>%
   filter(sample %in% smd[smd$nature == 'Biofilm',]$sample) %>%
@@ -593,7 +561,7 @@ seqcpm %>%
   # Calculate the mean abundance of each phylum over the categories
   summarise(mean_relab = sum(cpm), .groups = 'drop') %>%
   filter(!is.na(order)) %>%
-  top_n(11, mean_relab) -> t
+  top_n(10, mean_relab) -> t
 
 ncbi %>%
   left_join(t %>% transmute(order, topphylum = order), by = "order") %>%
@@ -612,14 +580,13 @@ seqcpm %>%
   labs(x = 'Counts per million', y = '') +
   facet_wrap(~ env, labeller = label_wrap_gen(width = 40)) +
   geom_col() +
-  scale_fill_brewer(palette = 'Paired') +
-  #scale_x_continuous(labels = function(x) format(x, scientific = TRUE), n.breaks = 6) +
+  scale_fill_manual(values = cols) +
   scale_x_continuous(labels = c(0, expression(0.5 %*% 10^5), expression(10^5),
                                 expression(1.5 %*% 10^5),""), n.breaks = 6, expand = c(0.002,0)) +
-  scale_y_discrete(labels = function(x) str_wrap(x, width = 35)) +
+  scale_y_discrete(labels = function(x) str_wrap(x, width = 25)) +
   theme_tidy(ratio = 2.0) + 
   theme(panel.border = element_blank(),
-        legend.position = c(.93,.70),
+        legend.position = c(.9,.7),
         strip.text = element_text(face = "bold"),
         axis.text.y = element_text(face = "plain", size = 6),
         axis.text.x = element_text(face = "bold"),
@@ -631,9 +598,9 @@ seqcpm %>%
 ```
 
 
-```{r export barplot eggnog}
-ggsave("figures/fig_5.pdf", height = 10, width = 14, units = "cm")
-ggsave("figures/fig_5.png", height = 10, width = 14, units = "cm")
+```{r Fig. 5 export barplot eggnog}
+ggsave("figures/fig_5.pdf", height = 10, width = 12, units = "cm")
+ggsave("figures/fig_5.png", height = 10, width = 12, units = "cm")
 ```
 
 
@@ -643,7 +610,7 @@ ggsave("figures/fig_5.png", height = 10, width = 14, units = "cm")
 ```{r differential expression}
 library(edgeR)
 rnatab %>% spread(sample, count, fill = 0) %>% column_to_rownames('geneid') -> d
-DGEList(d, group = smd_metat$treat) -> d
+DGEList(d, group = smd$treat) -> d
 
 # Filter based on cpm
 keep <- filterByExpr(d)
@@ -652,7 +619,7 @@ d <- d[keep, , keep.lib.sizes = F]
 calcNormFactors(d) -> d
 
 # Design matrix based on experimental design
-design.mat <- model.matrix(~ 0 + smd_metat$treat)
+design.mat <- model.matrix(~ 0 + smd$treat)
 rownames(design.mat) <- colnames(d)
 colnames(design.mat) <- levels(d$samples$group)
 
@@ -686,88 +653,88 @@ de_tm$table %>%
 
 de_mm %>% rbind(de_tm) %>% as_tibble() -> diffexp
 
-remove(de_mm, de_tm, de_mm_test, de_tm_test)
+remove(de_mm, de_tm, de_mm_test, de_tm_test, d, design.mat, fit)
 ```
 
 
-Fig. 6 and 7: please organise the y-axis according to function by grouping these categories, e.g., into "biofilm formation", "motility", "energy conservation", "transporters", "biosynthesis"...
+Fig. 6 and 7: please organise the y-axis according to function by grouping these categories, e.g., into "biofilm formation", "motility", "energy conservation", "transporters", "biosynthesis"... For the bar plot, the 11 most abundant taxonomic groups are selected (either phyla, classes or orders)
 
 
-```{r violin plot DE significant}
-diffexp %>%
-  inner_join(ncbi, by = "geneid") %>%
-  # Select significant DE genes
-  filter(diffexp != 0) %>%
-  # Set minimum data points
-  group_by(eggnog, aquifer) %>% add_tally() %>% filter(n > 2) %>% ungroup() %>%
-  # Call plot
-  ggplot(aes(x = logFC, y = eggnog)) +
-  labs(x = 'Log fold-change', y = '') + 
-  geom_violin() +
-  facet_wrap(~ aquifer, scales = "free_x") +
-  geom_vline(xintercept = 0, linetype = 'dotted') +
-  theme_tidy() + 
-  theme(aspect.ratio = 3.0, 
-        axis.text.y = element_text(size = 6),
-        panel.border = element_blank(),
-        axis.line.y.left = element_line(),
-        axis.line.x.bottom = element_line()) +
-  scale_y_discrete(labels = function(x) str_wrap(x, width = 35))
-```
+```{r prepare bar plot significant DE transcripts eggnog}
+cols <- c("Other" = "#a6cee3", "Unidentified" = "#d9d9d9",
+          "Acholeplasmatales" = "#969696", "Bacillales" = "#b15928", "Burkholderiales" = "#1f78b4",
+          "Campylobacterales" = "#33a02c", "Desulfobacterales" = "#e31a1c",
+          "Methanobacteriales" = "#ff7f00",
+          "Nitrosomonadales" = "#fdbf6f", "Rhizobiales" = "#cab2d6",
+          "Rhodocyclales" = "#6a3d9a", "Trichomonadida" = "#ffff99")
 
+i <- c("Translation, ribosomal structure and biogenesis","Cell wall/membrane/envelope biogenesis",
+       "Energy production and conversion","Cell motility","Posttranslational modification, protein turnover, chaperones","Signal transduction mechanisms",
+       "Amino acid transport and metabolism",
+       "Replication, recombination and repair","Carbohydrate transport and metabolism",
+       "Cytoskeleton")
 
-```{r export violin plot}
-ggsave('figures/fig_6.pdf', height = 14, width = 18, units = 'cm')
-```
-
-For the bar plot, the 11 most abundant taxonomic groups are selected (either phyla, classes or orders)
-
-
-```{r select 11 most abundant DE orders}
 seqcpm %>%
-  inner_join(diffexp, by = "geneid") %>% filter(diffexp != 0) %>%
-  inner_join(ncbi, by = 'geneid') %>%
+  filter(geneid %in% diffexp$geneid) %>%
+  inner_join(ncbi, by = "geneid") %>%
   group_by(order, sample) %>%
   # Sum the abundance of each phylum within a category
-  summarise(cpm = sum(cpm)) %>%
+  summarise(cpm = sum(cpm), .groups = "drop_last") %>%
   # Calculate the mean abundance of each phylum over the categories
   summarise(mean_relab = sum(cpm), .groups = 'drop') %>%
   filter(!is.na(order)) %>%
-  top_n(11, mean_relab) -> t
-```
+  top_n(10, mean_relab) -> t
 
-
-```{r add topphylum to taxonomy, message=FALSE, warning=FALSE}
-# Add column to taxonomy whether or not order is part of selection
 ncbi %>%
   left_join(t %>% transmute(order, topphylum = order), by = "order") %>%
-  replace_na(list("topphylum" = "Other")) %>%
-  select(geneid, topphylum) -> taxref
+  mutate(topphylum = if_else(is.na(order), "Unidentified", topphylum)) %>%
+  replace_na(list("topphylum" = "Other")) -> taxref
 ```
 
 
 ```{r bar plot significant DE transcripts eggnog}
 seqcpm %>%
-  inner_join(diffexp, by = "geneid") %>% filter(diffexp != 0) %>%
+  inner_join(diffexp, by = "geneid") %>% filter(diffexp != 0 & eggnog %in% i) %>%
   inner_join(taxref, by = 'geneid') %>%
   mutate(diffexp = if_else(diffexp == 1, "Planktonic", "Biofilm")) %>%
   mutate(aquifer = paste(aquifer, diffexp)) %>%
   group_by(topphylum, eggnog, aquifer) %>% summarise(cpm = sum(cpm), .groups = "drop") %>%
   ggplot(aes(x = cpm, 
-             y = eggnog,
-             fill = fct_relevel(topphylum, c('Other')))) +
+             y = fct_relevel(eggnog, i),
+             fill = fct_relevel(topphylum, c('Other','Unidentified')) %>% fct_rev()
+             )
+         ) +
   labs(x = 'Counts per million', y = '') +
-  facet_wrap(~ aquifer) +
+  facet_wrap(~ aquifer, nrow = 1, ncol = 4) +
   geom_col() +
-  scale_fill_brewer(palette = 'Paired') +
-  scale_x_continuous(labels = function(x) format(x, scientific = TRUE)) +
-  theme_tidy() +
-  theme(panel.border = element_blank(), axis.ticks.y = element_blank())
+  scale_fill_manual(values = cols) +
+  scale_x_continuous(labels = c(expression(bold("0")), 
+                                "", 
+                                expression(bold("10"^"5")),
+                                "",
+                                expression(bold("2"%*%"10"^"5")), 
+                                ""), 
+                     n.breaks = 5, expand = c(0.004,0)) +  
+  scale_y_discrete(labels = function(x) str_wrap(x, width = 25)) +
+  theme_tidy(ratio = 3.4) + 
+  theme(panel.border = element_blank(),
+        strip.background = element_rect(size = 0,fill = "#f0f0f0"),
+        axis.ticks.y = element_blank(),
+        legend.position = c(1,0.72),
+        strip.text = element_text(face = "bold"),
+        axis.text.y = element_text(face = "plain", size = 6, colour = "black"),
+        axis.text.x = element_text(face = "bold", size = 6),
+        legend.spacing.x = unit(0.5, "mm"),
+        legend.box.margin = margin(0,0,0,0),
+        legend.box.background = element_rect(size = .7, colour = "black"),
+        legend.key.size = unit(3.3, "mm"),
+        axis.line.x.bottom = element_line(colour = "black"))
 ```
 
 
 ```{r export barplot edger significant DE}
-ggsave('figures/fig7.pdf', height = 20, width = 22, units = 'cm')
+ggsave('figures/fig_7.pdf', height = 10, width = 16, units = 'cm')
+ggsave('figures/fig_7.png', height = 10, width = 16, units = 'cm')
 ```
 
 
@@ -806,51 +773,5 @@ ncbi %>%
 ```{r export barplot fungi}
 ggsave("figures/fungi.pdf", height = 12, width = 14, units = "cm")
 ggsave("figures/fungi.png", height = 12, width = 14, units = "cm")
-```
-
-
-```{r Venn}
-library(ggvenn)
-
-seqtab %>% 
-  inner_join(smd, by = "sample") %>% 
-  group_by(nature,seqid) %>% 
-  summarise(count = sum(count)) %>% 
-  mutate(relab = count / sum(count)) %>% ungroup() -> i
-
-i %>% 
-  filter(seqid %in% biofilm & seqid %in% planktonic) %>% 
-  filter(nature == "Planktonic") %>% pull(relab) %>% sum()
-
-seqtab %>% inner_join(smd, by = "sample") %>% 
-  filter(nature == "Planktonic") %>%
-  pull(seqid) %>% unique() -> planktonic
-
-seqtab %>% inner_join(smd, by = "sample") %>% 
-  filter(nature == "Biofilm") %>%
-  pull(seqid) %>% unique() -> biofilm
-
-seqtab %>%
-  select(seqid) %>%
-  distinct() %>%
-  mutate(Biofilm = if_else(seqid %in% biofilm, TRUE,FALSE)) %>%
-  mutate(Planktonic = if_else(seqid %in% planktonic, TRUE,FALSE)) %>%
-  ggplot(aes(A = Biofilm, B = Planktonic)) +
-  geom_venn(
-    show_percentage = FALSE,
-    fill_color = c("#2171b5","#c6dbef"),
-    fill_alpha = .7,
-    set_name_size = 6/.pt, text_size = 6/.pt,
-    stroke_size = .5) + 
-  annotate(geom = "text", x = -0.5, y = 0, label = "(84%)", size = 6/.pt) +
-  annotate(geom = "text", x = 1, y = 0, label = "(80%)", size = 6/.pt) +
-  theme_void() + 
-  theme(aspect.ratio = 1,
-                       plot.background = element_rect(fill = "white", size = 0),
-                       plot.margin = margin(0,0,0,0))
-```
-
-```{r export Venn}
-ggsave("figures/venn.png", height = 6, width = 8, units = "cm")
 ```
 
