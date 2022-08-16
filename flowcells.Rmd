@@ -96,17 +96,19 @@ seqtab %>%
 
 
 ```{r statistics alpha diversity}
+adiv %>% group_by(env,treat,age) %>% summarise(meandiv = mean(shannon), .groups = "drop") -> adiv
+
 suppressPackageStartupMessages(library(car))
 # Normality of the data (null hypothesis data is normally distributed)
-shapiro.test(adiv$shannon)
+shapiro.test(adiv$meandiv)
 # Preferably all the dots on the diagonal
-qqPlot(adiv$shannon)
+qqPlot(adiv$meandiv)
 # Homogeneity of variance using Levene (null hypothesis variance is equal)
-leveneTest(shannon ~ paste(nature, desig), data = adiv)
+leveneTest(meandiv ~ env, data = adiv)
 # Run ANOVA (null hypothesis diversity is equal)
-aov(shannon ~ paste(nature, desig), data = adiv) %>% summary()
+aov(meandiv ~ env, data = adiv) %>% summary()
 # Post-hoc
-aov(shannon ~ paste(nature, desig), data = adiv) %>% TukeyHSD()
+aov(meandiv ~ env, data = adiv) %>% TukeyHSD()
 ```
 
 
@@ -114,21 +116,27 @@ Plot alpha diversity
 
 
 ```{r plot adiv}
-return.n <- function(x) {return(data.frame(label = paste('n =', length(x)), y = max(x) + 0.65))}
-
 adiv %>%
   ggplot(aes(x = shannon, y = fct_rev(env))) + 
   geom_boxplot() +
   geom_jitter(width = 0.01, stroke = 0.8, size = 1, fill = "white", shape = 21, height = 0.1) +
-  #stat_summary(fun.data = return.n, geom = "text",
-               #size = 2.75,
-               #fun = median, 
-               #position = position_dodge(width = 0.75)) +
   labs(x = "Alpha diversity (Shannon index)", y = "") +
-  scale_x_continuous(limits = c(1,6), expand = c(0.002,0)) +
+  scale_x_continuous(limits = c(1,6), expand = c(0.004,0)) +
+  scale_y_discrete(labels = c("Biofilm TM-448.4\nn = 6","Planktonic TM-448.4\nn = 12",
+                              "Biofilm MM-171.3\nn = 6","Planktonic MM-171.3\nn = 12")) +
+  # Bracket TM-448.4
+  annotate(geom = "segment", lineend = "square", x = 5, xend = 5, y = 1, yend = 2) +
+  annotate(geom = "segment", lineend = "square", x = 4.9, xend = 5, y = 1, yend = 1) +
+  annotate(geom = "segment", lineend = "square", x = 4.9, xend = 5, y = 2, yend = 2) +
+  annotate(geom = "text", x = 5.2, y = 1.5, label = "ns", size = 6/.pt) +
+  # Bracket MM-171.3
+  annotate(geom = "segment", lineend = "square", x = 5.7, xend = 5.7, y = 3, yend = 4) +
+  annotate(geom = "segment", lineend = "square", x = 5.6, xend = 5.7, y = 3, yend = 3) +
+  annotate(geom = "segment", lineend = "square", x = 5.6, xend = 5.7, y = 4, yend = 4) +
+  annotate(geom = "text", x = 5.9, y = 3.5, label = "ns", size = 6/.pt) +
   theme_clean(ratio = 1.6) +
   theme(plot.tag.position = c(.2,.99),
-        axis.text.y.left = element_text(face = "plain"))  -> a
+        axis.text.y.left = element_text(face = "plain", hjust = 0.5))  -> a
 ```
 
 
@@ -217,7 +225,7 @@ seqtab %>%
 
 
 
-## Bar plot DNA
+## Fig. 2:  Bar plot DNA
 
 
 ```{r bar plot DNA phylum}
@@ -364,7 +372,7 @@ seqtab %>%
   coord_fixed(expand = FALSE) +
   theme_void() + 
   theme(aspect.ratio = 1, plot.tag.position = c(.1,1.02),
-        plot.margin = margin(0,0,0,0)) -> c
+        plot.margin = margin(0,0,0,0)) #-> c
 ```
 
 
@@ -473,16 +481,16 @@ seqcpm %>%
   # Only use transcripts annotated on phylum level
   inner_join(ncbi, by = "geneid") %>%
   inner_join(smd, by = "sample") %>%
-  group_by(phylum, env) %>%
+  group_by(order, env) %>%
   # Sum the abundance of each phylum within a category
   summarise(cpm = sum(cpm), .groups = "drop_last") %>%
   # Calculate the mean abundance of each phylum over the categories
   summarise(mean_relab = sum(cpm), .groups = 'drop') %>%
-  filter(!is.na(phylum)) %>%
-  top_n(6, mean_relab) -> t
+  filter(!is.na(order)) %>%
+  top_n(10, mean_relab) -> t
 
 ncbi %>%
-  left_join(t %>% transmute(phylum, topphylum = phylum), by = "phylum") %>%
+  left_join(t %>% transmute(order, topphylum = order), by = "order") %>%
   mutate(topphylum = if_else(is.na(phylum), "Unidentified", topphylum)) %>%
   mutate(topphylum = if_else(topphylum == "Proteobacteria", class, topphylum)) %>%
   replace_na(list("topphylum" = "Other")) -> taxref
@@ -490,13 +498,12 @@ ncbi %>%
 
 
 ```{r barplot mRNA phylum level}
-cols <- c('Other' = '#A6CEE3', 'Unidentified' = '#4992C2',
-'Alphaproteob.' = '#AADB84',
-'Bacteroidetes' = '#52AF43', 'Betaproteob.' = '#8A9D5B',
-'Deltaproteob.' = '#E73233', 'Epsilonproteob.' = '#fdbf6f',
-'Eukaryota' = '#FE870D', 'Euryarchaeota' = '#E19B78',
-'Firmicutes' = '#fccde5', 'Gammaproteob.' = '#bc80bd',
-'Tenericutes' = '#C7B699')
+cols <- c("Other" = "#a6cee3", "Unidentified" = "#d9d9d9",
+          "Acholeplasmatales" = "#969696", "Burkholderiales" = "#1f78b4",
+          "Campylobacterales" = "#33a02c", "Clostridiales" = "#b2df8a", "Desulfobacterales" = "#e31a1c",
+          "Methanobacteriales" = "#ff7f00",
+          "Nitrosomonadales" = "#fdbf6f", "Rhizobiales" = "#cab2d6",
+          "Rhodocyclales" = "#6a3d9a", "Trichomonadida" = "#ffff99")
 
 seqcpm %>%
   inner_join(taxref, by = "geneid") %>%
@@ -509,20 +516,20 @@ seqcpm %>%
   ggplot(aes(x = fct_rev(env), 
              y = cpm, 
              fill = fct_relevel(topphylum, c('Other', 'Unidentified')))) +
-  labs(x = '', y = 'Counts per million') + 
-  scale_y_continuous(labels = c(expression(10^6), "", expression(5 %*% 10^5), "", "0"), 
+  labs(y = expression(bold('Counts per million (' %*% '1000)')), x = '') +
+  scale_y_continuous(labels = c(expression(bold("1000")), expression(bold("750")), expression(bold("500")), expression(bold("250")), expression(bold("0"))), 
                      trans = 'reverse', expand = c(0.002,0)) +
   scale_x_discrete(labels = c("Biofilm\nTM-448.4","Planktonic\nTM-448.4",
                               "Biofilm\nMM-171.3","Planktonic\nMM-171.3")) +
   geom_col() +
   scale_fill_manual(values = cols) +
   coord_flip() + 
-  annotate('text', x = 1, y = 350000, size = 2, label = "41% Thiobacillaceae") +
-  annotate('text', x = 3, y = 350000, size = 2, label = "34% Desulfobacteraceae") +
+  annotate('text', x = 1, y = 430000, size = 2, label = "41% Thiobacillaceae") +
+  annotate('text', x = 3, y = 430000, size = 2, label = "34% Desulfobacteraceae") +
   theme_barplot(ratio = 1) + 
   guides(fill = guide_legend(nrow = 4)) +
   theme(legend.key.size = unit(3.5, "mm"),
-        axis.line.x = element_line())-> b
+        axis.line.x = element_line()) -> b
 ```
 
 
@@ -540,20 +547,18 @@ ggsave("figures/fig_4.png", height = 10, width = 16, units = "cm")
 
 ```{r Fig. 5 barplot biofilm order level eggnog}
 i <- c("Translation, ribosomal structure and biogenesis","Cell wall/membrane/envelope biogenesis",
-       "Energy production and conversion","Signal transduction mechanisms",
-       "Cell motility","Amino acid transport and metabolism",
+       "Energy production and conversion","Cell motility","Posttranslational modification, protein turnover, chaperones","Signal transduction mechanisms",
+       "Amino acid transport and metabolism",
        "Replication, recombination and repair","Carbohydrate transport and metabolism",
-       "Lipid transport and metabolism","Nucleotide transport and metabolism",
-       "Defense mechanisms","RNA processing and modification")
+       "Cytoskeleton")
 
-cols <- c("Other" = "#a6cee3", "Burkholderiales" = "#1f78b4",
+cols <- c("Other" = "#a6cee3","Unidentified" = "#d9d9d9", "Burkholderiales" = "#1f78b4",
           "Campylobacterales" = "#33a02c", "Chromatiales" = "#fb9a99", "Desulfobacterales" = "#e31a1c",
           "Desulfovibrionales" = "grey",
           "Nitrosomonadales" = "#fdbf6f", "Pseudomonadales" = "#ff7f00", "Rhizobiales" = "#cab2d6",
           "Rhodocyclales" = "#6a3d9a", "Sphingomonadales" = "#ffff99")
 
 seqcpm %>%
-  filter(sample %in% smd[smd$nature == 'Biofilm',]$sample) %>%
   inner_join(ncbi, by = "geneid") %>%
   group_by(order, sample) %>%
   # Sum the abundance of each phylum within a category
@@ -565,6 +570,7 @@ seqcpm %>%
 
 ncbi %>%
   left_join(t %>% transmute(order, topphylum = order), by = "order") %>%
+  mutate(topphylum = if_else(is.na(order), "Unidentified", topphylum)) %>%
   replace_na(list("topphylum" = "Other")) %>%
   inner_join(eggnogs, by = "geneid") -> taxref
 
@@ -595,16 +601,47 @@ seqcpm %>%
         axis.ticks.y.left = element_line(),
         axis.line.x.bottom = element_line(colour = "black"),
         axis.line.y.left = element_line(colour = "black"))
+
+seqcpm %>%
+  inner_join(taxref, by = 'geneid') %>%
+  filter(eggnog %in% i) %>%
+  inner_join(smd, by = "sample") %>%
+  mutate(designation = paste(designation,nature)) %>%
+  group_by(topphylum, eggnog, designation) %>% summarise(cpm = sum(cpm), .groups = "drop") %>%
+  ggplot(aes(x = cpm, 
+             y = fct_relevel(eggnog, i),
+             fill = fct_relevel(topphylum, c('Other','Unidentified')) %>% fct_rev()
+             )
+         ) +
+  labs(x = expression(bold('Counts per million (' %*% '1000)')), y = '') +
+  facet_wrap(~ designation, nrow = 1, ncol = 4) +
+  geom_col() +
+  scale_fill_manual(values = cols) +
+  scale_x_continuous(labels = c("0","50","100","150",""), n.breaks = 5, expand = c(0.004,0)) +  
+  scale_y_discrete(labels = function(x) str_wrap(x, width = 25)) +
+  theme_tidy(ratio = 3.4) + 
+  theme(panel.border = element_blank(),
+        strip.background = element_rect(size = 0,fill = "#f0f0f0"),
+        axis.ticks.y = element_blank(),
+        legend.position = c(1,0.72),
+        strip.text = element_text(face = "bold"),
+        axis.text.y = element_text(face = "plain", size = 6, colour = "black"),
+        axis.text.x = element_text(face = "bold", size = 6),
+        legend.spacing.x = unit(0.5, "mm"),
+        legend.box.margin = margin(0,0,0,0),
+        legend.box.background = element_rect(size = .7, colour = "black"),
+        legend.key.size = unit(3.3, "mm"),
+        axis.line.x.bottom = element_line(colour = "black"))
 ```
 
 
 ```{r Fig. 5 export barplot eggnog}
-ggsave("figures/fig_5.pdf", height = 10, width = 12, units = "cm")
-ggsave("figures/fig_5.png", height = 10, width = 12, units = "cm")
+ggsave("figures/fig_5.pdf", height = 10, width = 16, units = "cm")
+ggsave("figures/fig_5.png", height = 10, width = 16, units = "cm")
 ```
 
 
-## Differential gene expression using EdgeR
+## Fig. 7: Differential gene expression using EdgeR
 
 
 ```{r differential expression}
@@ -704,15 +741,15 @@ seqcpm %>%
              fill = fct_relevel(topphylum, c('Other','Unidentified')) %>% fct_rev()
              )
          ) +
-  labs(x = 'Counts per million', y = '') +
+  labs(x = expression(bold('Counts per million (' %*% '1000)')), y = '') +
   facet_wrap(~ aquifer, nrow = 1, ncol = 4) +
   geom_col() +
   scale_fill_manual(values = cols) +
   scale_x_continuous(labels = c(expression(bold("0")), 
                                 "", 
-                                expression(bold("10"^"5")),
+                                expression(bold("100")),
                                 "",
-                                expression(bold("2"%*%"10"^"5")), 
+                                expression(bold("200")), 
                                 ""), 
                      n.breaks = 5, expand = c(0.004,0)) +  
   scale_y_discrete(labels = function(x) str_wrap(x, width = 25)) +
