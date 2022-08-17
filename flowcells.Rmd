@@ -96,7 +96,7 @@ seqtab %>%
 
 
 ```{r statistics alpha diversity}
-adiv %>% group_by(env,treat,age) %>% summarise(meandiv = mean(shannon), .groups = "drop") -> adiv
+adiv %>% filter(designation == "TM-448.4") %>% group_by(env,treat,age) %>% summarise(meandiv = mean(shannon), .groups = "drop") -> stat
 
 suppressPackageStartupMessages(library(car))
 # Normality of the data (null hypothesis data is normally distributed)
@@ -106,7 +106,7 @@ qqPlot(adiv$meandiv)
 # Homogeneity of variance using Levene (null hypothesis variance is equal)
 leveneTest(meandiv ~ env, data = adiv)
 # Run ANOVA (null hypothesis diversity is equal)
-aov(meandiv ~ env, data = adiv) %>% summary()
+aov(meandiv ~ env, data = stat) %>% summary()
 # Post-hoc
 aov(meandiv ~ env, data = adiv) %>% TukeyHSD()
 ```
@@ -117,25 +117,33 @@ Plot alpha diversity
 
 ```{r plot adiv}
 adiv %>%
-  ggplot(aes(x = shannon, y = fct_rev(env))) + 
+  mutate(age = if_else(nature == "Planktonic", "", gsub("d"," d", age))) %>%
+  ggplot(aes(x = shannon, y = fct_rev(env))) +
   geom_boxplot() +
   geom_jitter(width = 0.01, stroke = 0.8, size = 1, fill = "white", shape = 21, height = 0.1) +
   labs(x = "Alpha diversity (Shannon index)", y = "") +
-  scale_x_continuous(limits = c(1,6), expand = c(0.004,0)) +
+  scale_x_continuous(limits = c(1,6), expand = c(0.004,0), breaks = ) +
   scale_y_discrete(labels = c("Biofilm TM-448.4\nn = 6","Planktonic TM-448.4\nn = 12",
                               "Biofilm MM-171.3\nn = 6","Planktonic MM-171.3\nn = 12")) +
+  ggrepel::geom_text_repel(aes(label = age), color = "black",
+                  box.padding = 0.3, 
+                  max.overlaps = 10,
+                  min.segment.length = 0.4,
+                  size = 6/.pt) +
   # Bracket TM-448.4
-  annotate(geom = "segment", lineend = "square", x = 5, xend = 5, y = 1, yend = 2) +
-  annotate(geom = "segment", lineend = "square", x = 4.9, xend = 5, y = 1, yend = 1) +
-  annotate(geom = "segment", lineend = "square", x = 4.9, xend = 5, y = 2, yend = 2) +
-  annotate(geom = "text", x = 5.2, y = 1.5, label = "ns", size = 6/.pt) +
+  #annotate(geom = "segment", lineend = "square", x = 5, xend = 5, y = 1, yend = 2) +
+  #annotate(geom = "segment", lineend = "square", x = 4.9, xend = 5, y = 1, yend = 1) +
+  #annotate(geom = "segment", lineend = "square", x = 4.9, xend = 5, y = 2, yend = 2) +
+  #annotate(geom = "text", x = 5.2, y = 1.5, label = "ns", size = 6/.pt) +
   # Bracket MM-171.3
-  annotate(geom = "segment", lineend = "square", x = 5.7, xend = 5.7, y = 3, yend = 4) +
-  annotate(geom = "segment", lineend = "square", x = 5.6, xend = 5.7, y = 3, yend = 3) +
-  annotate(geom = "segment", lineend = "square", x = 5.6, xend = 5.7, y = 4, yend = 4) +
-  annotate(geom = "text", x = 5.9, y = 3.5, label = "ns", size = 6/.pt) +
+  #annotate(geom = "segment", lineend = "square", x = 5.7, xend = 5.7, y = 3, yend = 4) +
+  #annotate(geom = "segment", lineend = "square", x = 5.6, xend = 5.7, y = 3, yend = 3) +
+  #annotate(geom = "segment", lineend = "square", x = 5.6, xend = 5.7, y = 4, yend = 4) +
+  #annotate(geom = "text", x = 5.9, y = 3.5, label = "ns", size = 6/.pt) +
   theme_clean(ratio = 1.6) +
-  theme(plot.tag.position = c(.2,.99),
+  theme(plot.tag.position = c(.2,1.01),
+        panel.grid.major.y = element_blank(),
+        panel.grid.major.x = element_line(linetype = "dotted", color = "grey", size = 0.3),
         axis.text.y.left = element_text(face = "plain", hjust = 0.5))  -> a
 ```
 
@@ -172,18 +180,23 @@ pca.eigs    <- pca$CA$eig %>% data.frame() %>% tibble::rownames_to_column('pc') 
 
 
 ```{r Plot PCA}
-library(ggrepel)
+pca.samples %>% select(1:3) %>% inner_join(smd, by = "sample") -> df
+
+#getting the convex hull of each unique point set
+find_hull <- function(df) df[chull(df$PC1, df$PC2), ]
+hulls <- plyr::ddply(df, "nature", find_hull)
 
 pca.samples %>%
   inner_join(smd, by = 'sample') %>%
-  mutate(age = if_else(nature == "Planktonic", "", age)) %>%
-  mutate(age = gsub('d', ' d', age)) %>%
-  ggplot(aes(x = PC1, y = PC2)) +
+  mutate(age = if_else(nature == "Planktonic", "", gsub("d"," d",age))) %>%
+  ggplot(aes(x = PC1, y = PC2, fill = nature)) +
+  geom_polygon(data = hulls,alpha = .3) +
   # Points for samples, coloured by nature
   geom_point(aes(colour = nature, shape = designation), size = 3) +
   # Labelled according to groundwater type
   scale_color_grey() + 
-  geom_text_repel(aes(label = age), color = "black",
+  scale_fill_grey() +
+  ggrepel::geom_text_repel(aes(label = age), color = "black",
                   box.padding = 0.3, 
                   max.overlaps = 12,
                   min.segment.length = 0.5,
@@ -195,7 +208,7 @@ pca.samples %>%
   geom_hline(yintercept = 0, linetype = 'dotted') +
   theme_tidy() +
   theme(legend.spacing.x = unit(0.0, "mm"),
-        plot.tag.position = c(.02,.99)) -> b
+        plot.tag.position = c(.02,1.01)) -> b
 ```
 
 
@@ -231,7 +244,7 @@ seqtab %>%
 ```{r bar plot DNA phylum}
 cols <- c('Other' = '#A6CEE3', 'Actinobacteria' = '#569EA4', 'Alphaproteobacteria' = '#AADB84',
 'Bacteroidetes' = '#52AF43', 'Chloroflexi' = '#F88A89',
-'Deltaproteobacteria' = '#E73233', 'Epsilonproteobacteria' = '#fdbf6f',
+'Deltaproteobacteria' = '#E73233', 'Epsilonbacteraeota' = '#fdbf6f',
 'Firmicutes' = '#fccde5', 'Gammaproteobacteria' = '#bc80bd', "Omnitrophicaeota" = '#3D3F99',
 'Patescibacteria' = '#ffff99', 'Spirochaetes' = '#b15928')
 
@@ -487,7 +500,7 @@ seqcpm %>%
   # Calculate the mean abundance of each phylum over the categories
   summarise(mean_relab = sum(cpm), .groups = 'drop') %>%
   filter(!is.na(order)) %>%
-  top_n(10, mean_relab) -> t
+  top_n(12, mean_relab) -> t
 
 ncbi %>%
   left_join(t %>% transmute(order, topphylum = order), by = "order") %>%
@@ -499,9 +512,9 @@ ncbi %>%
 
 ```{r barplot mRNA phylum level}
 cols <- c("Other" = "#a6cee3", "Unidentified" = "#d9d9d9",
-          "Acholeplasmatales" = "#969696", "Burkholderiales" = "#1f78b4",
+          "Acholeplasmatales" = "#969696", "Bacillales" = "#b15928", "Burkholderiales" = "#1f78b4",
           "Campylobacterales" = "#33a02c", "Clostridiales" = "#b2df8a", "Desulfobacterales" = "#e31a1c",
-          "Methanobacteriales" = "#ff7f00",
+          "Enterobacterales" = "#fb9a99", "Methanobacteriales" = "#ff7f00",
           "Nitrosomonadales" = "#fdbf6f", "Rhizobiales" = "#cab2d6",
           "Rhodocyclales" = "#6a3d9a", "Trichomonadida" = "#ffff99")
 
@@ -527,8 +540,8 @@ seqcpm %>%
   annotate('text', x = 1, y = 430000, size = 2, label = "41% Thiobacillaceae") +
   annotate('text', x = 3, y = 430000, size = 2, label = "34% Desulfobacteraceae") +
   theme_barplot(ratio = 1) + 
-  guides(fill = guide_legend(nrow = 4)) +
-  theme(legend.key.size = unit(3.5, "mm"),
+  guides(fill = guide_legend(nrow = 5)) +
+  theme(legend.key.size = unit(3.3, "mm"),
         axis.line.x = element_line()) -> b
 ```
 
@@ -810,5 +823,16 @@ ncbi %>%
 ```{r export barplot fungi}
 ggsave("figures/fungi.pdf", height = 12, width = 14, units = "cm")
 ggsave("figures/fungi.png", height = 12, width = 14, units = "cm")
+```
+
+```{r}
+seqtab %>%
+  # Filter out very low abundant ASVs
+  group_by(seqid) %>% filter(count > 10) %>% ungroup() %>%
+  select(-relab) %>% spread(sample, count, fill = 0) %>%
+  column_to_rownames('seqid') %>%
+  ALDEx2::aldex(conditions = smd %>% arrange(sample) %>% filter(!is.na(age)) %>% pull(nature)) %>%
+  rownames_to_column("seqid") %>%
+  inner_join(tax) -> aldex
 ```
 
