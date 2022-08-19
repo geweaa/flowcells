@@ -304,8 +304,9 @@ barplot(taxlevel = "genus", n = 12) %>%
   scale_fill_manual(values = cols) +
   coord_flip() + 
   scale_y_continuous(trans = 'reverse', labels = c('100','75','50','25','0'), expand = c(0.004,0)) + 
-  theme_barplot(ratio = 2.5) + 
-  theme(legend.key.size = unit(3.5, "mm"),
+  theme_barplot(ratio = 2) + 
+  theme(legend.key.size = unit(3, "mm"), legend.text = element_text(size = 6), legend.margin = margin(0,0,0,0),
+        legend.box.margin = margin(0,0,0,0), legend.box.spacing = unit(0, "mm"),
         legend.position = "left",
         axis.line.x = element_line(),
         axis.text.y = element_text(face = "bold"),
@@ -332,7 +333,7 @@ seqtab %>%
   geom_segment(aes(xend = env, y = 0, yend = relab), color = "black", size = 0.3) +
   geom_point(stroke = 0.8, size = 2, fill = "white", shape = 21) +
   geom_label(aes(label = genus, hjust = hjust), 
-            color = "black", fontface = "plain", size = 1.5, label.size = 0.1, label.padding = unit(0.10, "lines")) +
+            color = "black", fontface = "plain", size = 1.8, label.size = 0.1, label.padding = unit(0.10, "lines")) +
   coord_flip() +
   scale_y_continuous(expand = c(0.004,0), limits = c(0,100), breaks = c(0,50,100), labels = c("0","50","100")) +
   labs(x = "", y = "Relative abundance (%)") +
@@ -369,8 +370,8 @@ barplot(taxlevel = "order", n = 12) %>%
   annotate('text', x = 7.5, y = -0.06, size = 6 / .pt, label = "Planktonic", angle = 90, hjust = 0.5) +
   coord_flip(clip = "off") + 
   scale_y_continuous(trans = 'reverse', labels = c('100','75','50','25','0'), expand = c(0.004,0)) + 
-  theme_barplot(ratio = 2.5) + 
-  theme(legend.key.size = unit(3.5, "mm"),
+  theme_barplot(ratio = 2) + 
+  theme(legend.key.size = unit(3, "mm"), legend.text = element_text(size = 6), legend.box.margin = margin(0,0,0,0),
         legend.position = "right",
         axis.line.x = element_line(),
         axis.text.y = element_blank(),
@@ -390,8 +391,8 @@ a + b + c +
 
 
 ```{r export Fig. 2}
-ggsave("figures/fig_2.pdf", height = 8, width = 16, units = "cm")
-ggsave("figures/fig_2.png", height = 8, width = 16, units = "cm")
+ggsave("figures/fig_2.pdf", height = 10, width = 18, units = "cm")
+ggsave("figures/fig_2.png", height = 10, width = 18, units = "cm")
 ```
 
 
@@ -522,8 +523,8 @@ seqcpm %>%
   labs(y = expression(bold('Counts per million (' %*% '1000)')), x = '') +
   scale_y_continuous(labels = c(expression(bold("1000")), expression(bold("750")), expression(bold("500")), expression(bold("250")), expression(bold("0"))), 
                      trans = 'reverse', expand = c(0.002,0)) +
-  scale_x_discrete(labels = c("Biofilm\nTM-448.4","Planktonic\nTM-448.4",
-                              "Biofilm\nMM-171.3","Planktonic\nMM-171.3")) +
+  scale_x_discrete(labels = c("Biofilm 75 d\nTM-448.4","Planktonic\nTM-448.4",
+                              "Biofilm 75 d\nMM-171.3","Planktonic\nMM-171.3")) +
   geom_col() +
   scale_fill_manual(values = cols) +
   coord_flip() + 
