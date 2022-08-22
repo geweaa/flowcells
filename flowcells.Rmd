@@ -148,62 +148,54 @@ adiv %>%
 ```
 
 
-## Fig. 1b: PCA on Hellinger-transformed dataset DNA
+## Fig. 1b: NMDS on dataset DNA
 
-
-Hellinger transform the absolute counts
-
-
-```{r run PCA}
+```{r run nmds, results='hide'}
 seqtab %>%
-  select(-relab) %>%
-  spread(seqid, count, fill = 0) %>%
-  column_to_rownames("sample") %>%
-  vegan::decostand(method = 'hellinger') %>%
-  rownames_to_column('sample') %>%
-  gather(seqid, hellinger, -1) %>%
-  filter(hellinger > 0) %>%
-  mutate(hellinger = as.numeric(hellinger)) %>%
-  spread(seqid, hellinger, fill = 0) %>%
-  column_to_rownames('sample') %>% 
-  vegan::rda() -> pca
+  group_by(seqid) %>% filter(count > 2) %>% ungroup() %>%
+  select(seqid, sample, count) %>% spread(seqid, count, fill = 0) %>%
+  column_to_rownames("sample") -> t
+
+set.seed(999)
+t %>%  vegan::metaMDS(trymax = 50, k = 2, autotransform = T) -> nmds
 ```
 
+Extract the scores
 
-```{r Extract PCA values}
-pca.samples <- pca$CA$u %>% data.frame() %>% tibble::rownames_to_column('sample')
-pca.geneid    <- pca$CA$v %>% data.frame() %>% tibble::rownames_to_column('seqid')
-pca.eigs    <- pca$CA$eig %>% data.frame() %>% tibble::rownames_to_column('pc') %>%
-  rename(eigval = 2) %>%
-  mutate(propexpl = eigval/sum(eigval))
+```{r nmds.scores}
+vegan::scores(nmds) %>%
+  as.data.frame() %>%
+  rownames_to_column("sample") %>%
+  inner_join(smd, by = "sample") -> nmds.scores
 ```
 
+Plot the ordination
 
-```{r Plot PCA}
-pca.samples %>% select(1:3) %>% inner_join(smd, by = "sample") -> df
+```{r nmds plot, include = T}
+nmds.scores %>% select(1:3) %>% inner_join(smd, by = "sample") -> df
 
 #getting the convex hull of each unique point set
-find_hull <- function(df) df[chull(df$PC1, df$PC2), ]
+find_hull <- function(df) df[chull(df$NMDS1, df$NMDS2), ]
 hulls <- plyr::ddply(df, "nature", find_hull)
 
-pca.samples %>%
-  inner_join(smd, by = 'sample') %>%
+nmds.scores %>%
   mutate(age = if_else(nature == "Planktonic", "", gsub("d"," d",age))) %>%
-  ggplot(aes(x = PC1, y = PC2, fill = nature)) +
+  ggplot(aes(x = NMDS1, y = NMDS2, fill = nature)) +
   geom_polygon(data = hulls,alpha = .3) +
   # Points for samples, coloured by nature
   geom_point(aes(colour = nature, shape = designation), size = 3) +
   # Labelled according to groundwater type
   scale_color_grey() + 
   scale_fill_grey() +
+  annotate('text', x = Inf, y = -Inf, size = 6/.pt, 
+           label = paste('Stress = ', round(nmds$stress, digits = 2)),
+           hjust = 1.1, vjust = -1,
+           ) +
   ggrepel::geom_text_repel(aes(label = age), color = "black",
                   box.padding = 0.3, 
                   max.overlaps = 12,
                   min.segment.length = 0.5,
                   size = 6/.pt) +
-  #geom_text(aes(label = age), size = 6/.pt, hjust = -0.5) +
-  xlab(sprintf("PC1 (%2.1f%% explained)", pca.eigs[1,3] * 100)) +
-  ylab(sprintf("PC2 (%2.1f%% explained)", pca.eigs[2,3] * 100)) +
   geom_vline(xintercept = 0, linetype = 'dotted') +
   geom_hline(yintercept = 0, linetype = 'dotted') +
   theme_tidy() +
@@ -230,10 +222,19 @@ Statistics on beta diversity: PERMANOVA
 ```{r permanova}
 seqtab %>%
   select(-relab) %>%
+  inner_join(smd[,c("sample","nature")], by = "sample") %>% 
   spread(seqid, count, fill = 0) %>%
-  column_to_rownames("sample") %>%
-  vegan::decostand(method = 'hellinger') %>%
-  pairwiseAdonis::pairwise.adonis(factors = smd$env, sim.method = 'euclidean')
+  column_to_rownames("sample") -> t
+
+vegan::adonis(t[,c(-1)] ~ nature, data = t)
+
+seqtab %>%
+  select(-relab) %>%
+  inner_join(smd[,c("sample","env")], by = "sample") %>% 
+  spread(seqid, count, fill = 0) %>%
+  column_to_rownames("sample") -> t
+  
+pairwiseAdonis::pairwise.adonis(t[,c(-1)], factors = t$env)
 ```
 
 
@@ -428,39 +429,54 @@ read_tsv('taxa.tsv', col_types = cols(.default = col_character())) -> ncbi
 Transform the genecounts
 
 
-```{r run PCA RNA}
+
+```{r run nmds, results='hide'}
 rnatab %>%
-  # Vegan transformation
-  spread(geneid, count, fill = 0) %>%
-  column_to_rownames("sample") %>%
-  vegan::decostand(method = 'hellinger') %>%
-  vegan::rda() -> pca
+  select(geneid, sample, count) %>% spread(geneid, count, fill = 0) %>%
+  column_to_rownames("sample") -> t
+
+set.seed(999)
+t %>%  vegan::metaMDS(trymax = 50, k = 2, autotransform = T) -> nmds
 ```
 
+Extract the scores
 
-```{r Extract PCA RNA values}
-pca.samples <- pca$CA$u %>% data.frame() %>% tibble::rownames_to_column('sample')
-pca.geneid    <- pca$CA$v %>% data.frame() %>% tibble::rownames_to_column('geneid')
-pca.eigs    <- pca$CA$eig %>% data.frame() %>% tibble::rownames_to_column('pc') %>%
-  rename(eigval = 2) %>%
-  mutate(propexpl = eigval/sum(eigval))
+```{r nmds.scores}
+vegan::scores(nmds) %>%
+  as.data.frame() %>%
+  rownames_to_column("sample") %>%
+  inner_join(smd, by = "sample") -> nmds.scores
 ```
 
+Plot the ordination
 
-```{r Plot PCA RNA}
-pca.samples %>%
-  inner_join(smd, by = 'sample') %>%
-  ggplot(aes(x = PC1, y = PC2)) +
+```{r nmds plot, include = T}
+nmds.scores %>% select(1:3) %>% inner_join(smd, by = "sample") -> df
+
+#getting the convex hull of each unique point set
+find_hull <- function(df) df[chull(df$NMDS1, df$NMDS2), ]
+hulls <- plyr::ddply(df, "nature", find_hull)
+
+nmds.scores %>%
+  mutate(age = if_else(nature == "Planktonic", "", gsub("d"," d",age))) %>%
+  ggplot(aes(x = NMDS1, y = NMDS2, fill = nature)) +
+  geom_polygon(data = hulls,alpha = .3) +
   # Points for samples, coloured by nature
   geom_point(aes(colour = nature, shape = designation), size = 3) +
-  scale_color_grey() +
-  xlab(sprintf("PC1 (%2.1f%% explained)", pca.eigs[1,3] * 100)) +
-  ylab(sprintf("PC2 (%2.1f%% explained)", pca.eigs[2,3] * 100)) +
+  # Labelled according to groundwater type
+  scale_color_grey() + 
+  scale_fill_grey() +
+  annotate('text', x = Inf, y = -Inf, size = 6/.pt, 
+           label = paste('Stress = ', round(nmds$stress, digits = 2)),
+           hjust = 1.1, vjust = -1,
+           ) +
   geom_vline(xintercept = 0, linetype = 'dotted') +
   geom_hline(yintercept = 0, linetype = 'dotted') +
   theme_tidy() +
-  theme(legend.spacing.x = unit(-0.5, "mm")) -> a
+  theme(legend.spacing.x = unit(0.0, "mm"),
+        plot.tag.position = c(.02,1.01)) -> a
 ```
+
 
 ## Fig. 4b: Barplot mRNA
 
@@ -547,6 +563,19 @@ a + b + plot_annotation(tag_levels = "a", tag_suffix = ")") &
 ggsave("figures/fig_4.pdf", height = 10, width = 16, units = "cm")
 ggsave("figures/fig_4.png", height = 10, width = 16, units = "cm")
 ```
+
+
+```{r}
+set.seed(999)
+
+rnatab %>%
+  inner_join(smd[,c("sample","nature")], by = "sample") %>% 
+  spread(geneid, count, fill = 0) %>%
+  column_to_rownames("sample") -> t
+
+vegan::adonis(t[,c(-1)] ~ nature, data = t)
+```
+
 
 
 ```{r Fig. 5 barplot biofilm order level eggnog}
@@ -701,7 +730,7 @@ remove(de_mm, de_tm, de_mm_test, de_tm_test, d, design.mat, fit)
 Fig. 6 and 7: please organise the y-axis according to function by grouping these categories, e.g., into "biofilm formation", "motility", "energy conservation", "transporters", "biosynthesis"... For the bar plot, the 11 most abundant taxonomic groups are selected (either phyla, classes or orders)
 
 
-```{r prepare bar plot significant DE transcripts eggnog}
+```{r prepare plot DE eggnogs}
 cols <- c("Other" = "#a6cee3", "Unidentified" = "#d9d9d9",
           "Acholeplasmatales" = "#969696", "Bacillales" = "#b15928", "Burkholderiales" = "#1f78b4",
           "Campylobacterales" = "#33a02c", "Desulfobacterales" = "#e31a1c",
@@ -733,7 +762,7 @@ ncbi %>%
 ```
 
 
-```{r bar plot significant DE transcripts eggnog}
+```{r plot significant DE eggnogs}
 seqcpm %>%
   inner_join(diffexp, by = "geneid") %>% filter(diffexp != 0 & eggnog %in% i) %>%
   inner_join(taxref, by = 'geneid') %>%
@@ -773,7 +802,7 @@ seqcpm %>%
 ```
 
 
-```{r export barplot edger significant DE}
+```{r export plot DE eggnogs}
 ggsave('figures/fig_7.pdf', height = 10, width = 16, units = 'cm')
 ggsave('figures/fig_7.png', height = 10, width = 16, units = 'cm')
 ```
@@ -826,4 +855,5 @@ seqtab %>%
   rownames_to_column("seqid") %>%
   inner_join(tax) -> aldex
 ```
+
 
