@@ -42,7 +42,7 @@ read_tsv('smd.tsv', col_types = cols(.default = col_character(),
                                                         c("Planktonic MM-171.3","Biofilm MM-171.3",
                                                           "Planktonic TM-448.4","Biofilm TM-448.4")),
                                      treat = col_factor(levels = c(
-                                       "A","B","C","D","0.1","0.2"
+                                       "A","B","C","D"
                                      ))
                                      )
          ) -> smd
@@ -70,13 +70,13 @@ read_tsv('seqtab.tsv', col_types = cols(.default = col_character(), count = col_
 
 ```{r rarefaction}
 seqtab %>%
-  inner_join(smd, by = 'sample') %>% mutate(nature = paste(nature, desig)) %>%
-  group_by(nature, seqid) %>% summarise(count = sum(count), .groups = 'drop') %>%
+  inner_join(smd, by = 'sample') %>%
+  group_by(env, seqid) %>% summarise(count = sum(count), .groups = 'drop') %>%
   spread(seqid, count, fill = 0) %>%
-  column_to_rownames('nature') -> seqtab_matrix
+  column_to_rownames('env') -> seqtab_matrix
 
 min(rowSums(seqtab_matrix)) %>%
-vegan::rarecurve(seqtab_matrix, sample = ., step = 100, xlab = 'Sequencing depth', ylab = 'Diversity (# ASVs)', label = TRUE)
+vegan::rarecurve(seqtab_matrix, sample = ., step = 100, xlab = 'Sequencing depth (No. reads)', ylab = 'Diversity (No. ASVs)', label = TRUE)
 ```
 
 
@@ -96,19 +96,19 @@ seqtab %>%
 
 
 ```{r statistics alpha diversity}
-adiv %>% filter(designation == "TM-448.4") %>% group_by(env,treat,age) %>% summarise(meandiv = mean(shannon), .groups = "drop") -> stat
+adiv %>% group_by(env,treat,age) %>% summarise(meandiv = mean(shannon), .groups = "drop") -> stat
 
 suppressPackageStartupMessages(library(car))
 # Normality of the data (null hypothesis data is normally distributed)
-shapiro.test(adiv$meandiv)
+shapiro.test(stat$meandiv)
 # Preferably all the dots on the diagonal
-qqPlot(adiv$meandiv)
+qqPlot(stat$meandiv)
 # Homogeneity of variance using Levene (null hypothesis variance is equal)
-leveneTest(meandiv ~ env, data = adiv)
+leveneTest(meandiv ~ env, data = stat)
 # Run ANOVA (null hypothesis diversity is equal)
 aov(meandiv ~ env, data = stat) %>% summary()
 # Post-hoc
-aov(meandiv ~ env, data = adiv) %>% TukeyHSD()
+aov(meandiv ~ env, data = stat) %>% TukeyHSD()
 ```
 
 
@@ -123,23 +123,18 @@ adiv %>%
   geom_jitter(width = 0.01, stroke = 0.8, size = 1, fill = "white", shape = 21, height = 0.1) +
   labs(x = "Alpha diversity (Shannon index)", y = "") +
   scale_x_continuous(limits = c(1,6), expand = c(0.004,0), breaks = ) +
-  scale_y_discrete(labels = c("Biofilm TM-448.4\nn = 6","Planktonic TM-448.4\nn = 12",
-                              "Biofilm MM-171.3\nn = 6","Planktonic MM-171.3\nn = 12")) +
+  scale_y_discrete(labels = 
+                     c(expression(atop(Biofilm~TM-448.4, paste(~italic("n")~" = 6"))),
+                       expression(atop(Planktonic~TM-448.4, paste(~italic("n")~" = 12"))),
+                       expression(atop(Biofilm~MM-171.3, paste(~italic("n")~" = 6"))),
+                       expression(atop(Planktonic~MM-171.3, paste(~italic("n")~" = 12")))
+                       )
+                   ) +
   ggrepel::geom_text_repel(aes(label = age), color = "black",
                   box.padding = 0.3, 
                   max.overlaps = 10,
                   min.segment.length = 0.4,
                   size = 6/.pt) +
-  # Bracket TM-448.4
-  #annotate(geom = "segment", lineend = "square", x = 5, xend = 5, y = 1, yend = 2) +
-  #annotate(geom = "segment", lineend = "square", x = 4.9, xend = 5, y = 1, yend = 1) +
-  #annotate(geom = "segment", lineend = "square", x = 4.9, xend = 5, y = 2, yend = 2) +
-  #annotate(geom = "text", x = 5.2, y = 1.5, label = "ns", size = 6/.pt) +
-  # Bracket MM-171.3
-  #annotate(geom = "segment", lineend = "square", x = 5.7, xend = 5.7, y = 3, yend = 4) +
-  #annotate(geom = "segment", lineend = "square", x = 5.6, xend = 5.7, y = 3, yend = 3) +
-  #annotate(geom = "segment", lineend = "square", x = 5.6, xend = 5.7, y = 4, yend = 4) +
-  #annotate(geom = "text", x = 5.9, y = 3.5, label = "ns", size = 6/.pt) +
   theme_clean(ratio = 1.6) +
   theme(plot.tag.position = c(.2,1.01),
         panel.grid.major.y = element_blank(),
@@ -172,21 +167,23 @@ vegan::scores(nmds) %>%
 Plot the ordination
 
 ```{r nmds plot, include = T}
-nmds.scores %>% select(1:3) %>% inner_join(smd, by = "sample") -> df
+nmds.scores %>% select(1:3) %>% inner_join(smd, by = "sample") -> t
 
 #getting the convex hull of each unique point set
-find_hull <- function(df) df[chull(df$NMDS1, df$NMDS2), ]
-hulls <- plyr::ddply(df, "nature", find_hull)
+find_hull <- function(t) t[chull(t$NMDS1, t$NMDS2), ]
+hulls <- plyr::ddply(t, "nature", find_hull)
 
 nmds.scores %>%
   mutate(age = if_else(nature == "Planktonic", "", gsub("d"," d",age))) %>%
   ggplot(aes(x = NMDS1, y = NMDS2, fill = nature)) +
-  geom_polygon(data = hulls,alpha = .3) +
+  geom_polygon(data = hulls, alpha = .3) +
   # Points for samples, coloured by nature
   geom_point(aes(colour = nature, shape = designation), size = 3) +
   # Labelled according to groundwater type
-  scale_color_grey() + 
-  scale_fill_grey() +
+  scale_color_manual(values = c(Biofilm = "#08519c", Planktonic = "#9ecae1")) +
+  scale_fill_manual(values = c(Biofilm = "#08519c", Planktonic = "#9ecae1")) +
+  #scale_color_grey() + 
+  #scale_fill_grey() +
   annotate('text', x = Inf, y = -Inf, size = 6/.pt, 
            label = paste('Stress = ', round(nmds$stress, digits = 2)),
            hjust = 1.1, vjust = -1,
@@ -204,15 +201,15 @@ nmds.scores %>%
 ```
 
 
-```{r Fig. 1}
+```{r Fig. 2}
 library(patchwork)
 a + b + plot_annotation(tag_levels = "a", tag_suffix = ")") &
   theme(plot.tag = element_text(size = 8, color = "black"))
 ```
 
-```{r export Fig. 1}
-ggsave("figures/fig_1.pdf", width = 16, height = 10, units = "cm")
-ggsave("figures/fig_1.png", width = 16, height = 10, units = "cm")
+```{r export Fig. 2}
+ggsave("figures/fig_2.pdf", width = 16, height = 10, units = "cm")
+ggsave("figures/fig_2.png", width = 16, height = 10, units = "cm")
 ```
 
 
@@ -268,17 +265,17 @@ barplot() %>%
   annotate('text', x = 7.5, y = -0.03, size = 6 / .pt, label = "Planktonic", angle = 90, hjust = 0.5) +
   coord_flip() + 
   scale_y_continuous(trans = 'reverse', labels = c('100','75','50','25','0')) +
-  theme_barplot(ratio = 1.4) + theme(legend.position = "right") #+
-  guides(fill = guide_legend(nrow = 3))
+  theme_barplot(ratio = 1.4) + theme(legend.position = "right")
 ```
 
 
 ```{r export barplot DNA phylum}
-ggsave("figures/fig_sx.pdf", height = 10, width = 12, units = "cm")
-ggsave("figures/fig_sx.png", height = 10, width = 12, units = "cm")
+ggsave("figures/fig_s2.pdf", height = 10, width = 12, units = "cm")
+ggsave("figures/fig_s2.png", height = 10, width = 12, units = "cm")
 ```
 
-```{r}
+
+```{r barplot DNA genus}
 # Ralstonia (Burkholderiales), Immundisolibacter (Immundisolibacterales), Sulfurimonas (Campylobacterales),
 # Brevundimonas (Caulobacterales), Desulfatiferula (Desulfobacterales), Methylotenera (Nitrosomonadales),
 # Pseudomonas (Pseudomonadales), Hoeflea (Rhizobiales), Parvibaculum (Parvibaculales), 
@@ -303,15 +300,21 @@ barplot(taxlevel = "genus", n = 12) %>%
   labs(x = '', y = 'Relative abundance (%)') +
   geom_col(width = 0.9) +
   scale_fill_manual(values = cols) +
-  coord_flip() + 
-  scale_y_continuous(trans = 'reverse', labels = c('100','75','50','25','0'), expand = c(0.004,0)) + 
+  coord_flip(clip = "off") + 
+  scale_y_continuous(trans = 'reverse', labels = c('100','75','50','25','0'), expand = c(0.004,0)) +
+  annotate(geom = "segment", x = .55, xend = 6.45, y = -.01, yend = -.01) +
+  annotate(geom = "segment", x = 6.55, xend = 8.45, y = -.01, yend = -.01) +
+  annotate('text', x = 3.5, y = -0.06, size = 6 / .pt, label = "Biofilm", angle = 90, hjust = 0.5) +
+  annotate('text', x = 7.5, y = -0.06, size = 6 / .pt, label = "Planktonic", angle = 90, hjust = 0.5) +
   theme_barplot(ratio = 2) + 
-  theme(legend.key.size = unit(3, "mm"), legend.text = element_text(size = 6), legend.margin = margin(0,0,0,0),
-        legend.box.margin = margin(0,0,0,0), legend.box.spacing = unit(0, "mm"),
-        legend.position = "left",
+  theme(legend.key.size = unit(3, "mm"), 
+        legend.text = element_text(size = 6), 
+        #legend.margin = margin(0,0,0,0),
+        legend.box.margin = margin(0,0,0,0), 
+        legend.position = "right",
         axis.line.x = element_line(),
-        axis.text.y = element_text(face = "bold"),
-        plot.margin = margin(4,5,4,0),
+        axis.text.y = element_blank(),
+        plot.margin = margin(4,0,4,0),
         plot.tag.position = c(.1,1.02)) -> a
 ```
 
@@ -347,7 +350,7 @@ seqtab %>%
 ```
 
 
-```{r bar plot DNA order}
+```{r barplot DNA order}
 cols <- c("Other" = "#a6cee3", "Burkholderiales" = "#1f78b4", "Ca. Falkowbacteria" = "#b2df8a",
           "Campylobacterales" = "#33a02c", "Caulobacterales" = "#fb9a99", "Desulfobacterales" = "#e31a1c",
           "Nitrosomonadales" = "#fdbf6f","Parvibaculales" = "#ff7f00", "Pseudomonadales" = "#efedf5", "Rhizobiales" = "#cab2d6",
@@ -365,35 +368,38 @@ barplot(taxlevel = "order", n = 12) %>%
   labs(x = '', y = 'Relative abundance (%)') +
   geom_col(width = 0.9) +
   scale_fill_manual(values = cols) +
-  annotate(geom = "segment", x = .55, xend = 6.45, y = -.01, yend = -.01) +
-  annotate(geom = "segment", x = 6.55, xend = 8.45, y = -.01, yend = -.01) +
-  annotate('text', x = 3.5, y = -0.06, size = 6 / .pt, label = "Biofilm", angle = 90, hjust = 0.5) +
-  annotate('text', x = 7.5, y = -0.06, size = 6 / .pt, label = "Planktonic", angle = 90, hjust = 0.5) +
+  #annotate(geom = "segment", x = .55, xend = 6.45, y = -.01, yend = -.01) +
+  #annotate(geom = "segment", x = 6.55, xend = 8.45, y = -.01, yend = -.01) +
+  #annotate('text', x = 3.5, y = -0.06, size = 6 / .pt, label = "Biofilm", angle = 90, hjust = 0.5) +
+  #annotate('text', x = 7.5, y = -0.06, size = 6 / .pt, label = "Planktonic", angle = 90, hjust = 0.5) +
   coord_flip(clip = "off") + 
   scale_y_continuous(trans = 'reverse', labels = c('100','75','50','25','0'), expand = c(0.004,0)) + 
   theme_barplot(ratio = 2) + 
-  theme(legend.key.size = unit(3, "mm"), legend.text = element_text(size = 6), legend.box.margin = margin(0,0,0,0),
-        legend.position = "right",
+  theme(legend.key.size = unit(3, "mm"),
+        legend.spacing.x = unit(0, "mm"),
+        legend.text = element_text(size = 6), 
+        legend.box.margin = margin(0,0,0,0),
+        legend.position = "left",
         axis.line.x = element_line(),
-        axis.text.y = element_blank(),
-        plot.margin = margin(4,0,4,0),
+        axis.text.y = element_text(face = "bold"),
+        plot.margin = margin(4,4,4,0),
         plot.tag.position = c(.1,1.02)) -> c
 ```
 
 
-```{r Fig. 2}
+```{r Fig. 3}
 library(patchwork)
 
-a + b + c +
+c + b + a +
   plot_annotation(tag_levels = "a", tag_suffix = ")") +
   plot_layout(nrow = 1) &
   theme(plot.tag = element_text(size = 8, color = "black"), plot.tag.position = "top")
 ```
 
 
-```{r export Fig. 2}
-ggsave("figures/fig_2.pdf", height = 10, width = 18, units = "cm")
-ggsave("figures/fig_2.png", height = 10, width = 18, units = "cm")
+```{r export Fig. 3}
+ggsave("figures/fig_3.pdf", height = 10, width = 18, units = "cm")
+ggsave("figures/fig_3.png", height = 10, width = 18, units = "cm")
 ```
 
 
@@ -401,36 +407,32 @@ ggsave("figures/fig_2.png", height = 10, width = 18, units = "cm")
 
 
 ```{r read data, message=FALSE, warning=FALSE}
-read_tsv('final.contigs.tsv') %>%
-  select(-Start, -Length, -End, -Strand, -Chr) %>%
-  rename(geneid = Geneid) %>%
-  gather(sample, count, -1) %>% filter(count > 0) %>%
-  mutate(sample = gsub('.pe.bowtie2.sorted.bam', '', sample)) %>%
-  mutate(count = as.integer(count)) -> rnatab
+read_tsv('final.contigs.tsv', col_types = cols(.default = col_character(),
+                                               count = col_integer()
+                                               )
+         )  -> rnatab
 
 # Read taxonomy (Prokka)
-read_tsv('prokka.tsv') %>% rename(geneid = locus_tag) -> prokka
+read_tsv('prokka.tsv', col_types = cols(.default = col_character(),
+                                        length_bp = col_integer()
+                                        )
+         ) %>% 
+  rename(geneid = locus_tag) -> prokka
 read_tsv('eggnogs.tsv', col_types = cols(.default = col_character())) -> eggnogs
-
-# Read sample metadata
-smd %>% 
-  filter(is.na(age)) %>% 
-  select(-age) %>%
-  mutate(treat = factor(treat, levels = c("A","B","C","D")))-> smd
 
 # Taxonomy (NCBI)
 read_tsv('taxa.tsv', col_types = cols(.default = col_character())) -> ncbi
 ```
 
 
-## Fig. 4a: PCA on Hellinger-transformed dataset
+## Fig. 4a: NMDS on Bray-Curtis dissimilarities (RNA)
 
 
 Transform the genecounts
 
 
 
-```{r run nmds, results='hide'}
+```{r run NMDS on RNA, results='hide'}
 rnatab %>%
   select(geneid, sample, count) %>% spread(geneid, count, fill = 0) %>%
   column_to_rownames("sample") -> t
@@ -441,7 +443,7 @@ t %>%  vegan::metaMDS(trymax = 50, k = 2, autotransform = T) -> nmds
 
 Extract the scores
 
-```{r nmds.scores}
+```{r nmds.scores RNA}
 vegan::scores(nmds) %>%
   as.data.frame() %>%
   rownames_to_column("sample") %>%
@@ -450,7 +452,7 @@ vegan::scores(nmds) %>%
 
 Plot the ordination
 
-```{r nmds plot, include = T}
+```{r NMDS plot RNA, include = T}
 nmds.scores %>% select(1:3) %>% inner_join(smd, by = "sample") -> df
 
 #getting the convex hull of each unique point set
@@ -458,14 +460,15 @@ find_hull <- function(df) df[chull(df$NMDS1, df$NMDS2), ]
 hulls <- plyr::ddply(df, "nature", find_hull)
 
 nmds.scores %>%
-  mutate(age = if_else(nature == "Planktonic", "", gsub("d"," d",age))) %>%
   ggplot(aes(x = NMDS1, y = NMDS2, fill = nature)) +
   geom_polygon(data = hulls,alpha = .3) +
   # Points for samples, coloured by nature
   geom_point(aes(colour = nature, shape = designation), size = 3) +
   # Labelled according to groundwater type
-  scale_color_grey() + 
-  scale_fill_grey() +
+  #scale_color_grey() + 
+  #scale_fill_grey() +
+  scale_color_manual(values = c(Biofilm = "#08519c", Planktonic = "#9ecae1")) +
+  scale_fill_manual(values = c(Biofilm = "#08519c", Planktonic = "#9ecae1")) +
   annotate('text', x = Inf, y = -Inf, size = 6/.pt, 
            label = paste('Stress = ', round(nmds$stress, digits = 2)),
            hjust = 1.1, vjust = -1,
@@ -473,8 +476,7 @@ nmds.scores %>%
   geom_vline(xintercept = 0, linetype = 'dotted') +
   geom_hline(yintercept = 0, linetype = 'dotted') +
   theme_tidy() +
-  theme(legend.spacing.x = unit(0.0, "mm"),
-        plot.tag.position = c(.02,1.01)) -> a
+  theme(legend.spacing.x = unit(0.0, "mm")) -> a
 ```
 
 
@@ -488,7 +490,7 @@ rnatab %>%
   filter(geneid %in% ncbi$geneid) %>%
   spread(sample, count, fill = 0) %>%
   column_to_rownames('geneid') %>%
-  edgeR::DGEList(group = smd$treat) %>% edgeR::cpm() %>%
+  edgeR::DGEList(group = na.omit(smd$treat)) %>% edgeR::cpm() %>%
   as.data.frame() %>%
   rownames_to_column('geneid') %>%
   gather(sample, cpm , -1) %>% filter(cpm > 0) %>% 
@@ -496,7 +498,7 @@ rnatab %>%
 ```
 
 
-```{r select 11 most abundant phyla RNA}
+```{r select 11 most abundant orders RNA}
 seqcpm %>%
   # Only use transcripts annotated on phylum level
   inner_join(ncbi, by = "geneid") %>%
@@ -517,7 +519,7 @@ ncbi %>%
 ```
 
 
-```{r barplot mRNA phylum level}
+```{r barplot mRNA order level}
 cols <- c("Other" = "#a6cee3", "Unidentified" = "#d9d9d9",
           "Acholeplasmatales" = "#969696", "Bacillales" = "#b15928", "Burkholderiales" = "#1f78b4",
           "Campylobacterales" = "#33a02c", "Clostridiales" = "#b2df8a", "Desulfobacterales" = "#e31a1c",
@@ -565,7 +567,7 @@ ggsave("figures/fig_4.png", height = 10, width = 16, units = "cm")
 ```
 
 
-```{r}
+```{r PERMANOVA on Bray-Curtis dissimilarities RNA}
 set.seed(999)
 
 rnatab %>%
@@ -578,18 +580,19 @@ vegan::adonis(t[,c(-1)] ~ nature, data = t)
 
 
 
-```{r Fig. 5 barplot biofilm order level eggnog}
+```{r Fig. s3 barplot biofilm order level eggnog}
 i <- c("Translation, ribosomal structure and biogenesis","Cell wall/membrane/envelope biogenesis",
        "Energy production and conversion","Cell motility","Posttranslational modification, protein turnover, chaperones","Signal transduction mechanisms",
        "Amino acid transport and metabolism",
        "Replication, recombination and repair","Carbohydrate transport and metabolism",
        "Cytoskeleton")
 
-cols <- c("Other" = "#a6cee3","Unidentified" = "#d9d9d9", "Burkholderiales" = "#1f78b4",
-          "Campylobacterales" = "#33a02c", "Chromatiales" = "#fb9a99", "Desulfobacterales" = "#e31a1c",
-          "Desulfovibrionales" = "grey",
-          "Nitrosomonadales" = "#fdbf6f", "Pseudomonadales" = "#ff7f00", "Rhizobiales" = "#cab2d6",
-          "Rhodocyclales" = "#6a3d9a", "Sphingomonadales" = "#ffff99")
+cols <- c("Other" = "#a6cee3","Unidentified" = "#d9d9d9", "Acholeplasmatales" = "#969696",
+          "Burkholderiales" = "#1f78b4",
+          "Campylobacterales" = "#33a02c", "Clostridiales" = "#b2df8a", "Desulfobacterales" = "#e31a1c",
+          "Methanobacteriales" = "#ff7f00",
+          "Nitrosomonadales" = "#fdbf6f", "Rhizobiales" = "#cab2d6",
+          "Rhodocyclales" = "#6a3d9a", "Trichomonadida" = "#ffff99")
 
 seqcpm %>%
   inner_join(ncbi, by = "geneid") %>%
@@ -606,34 +609,6 @@ ncbi %>%
   mutate(topphylum = if_else(is.na(order), "Unidentified", topphylum)) %>%
   replace_na(list("topphylum" = "Other")) %>%
   inner_join(eggnogs, by = "geneid") -> taxref
-
-seqcpm %>%
-  inner_join(taxref, by = 'geneid') %>% 
-  inner_join(smd, by = 'sample') %>% filter(nature == "Biofilm") %>%
-  filter(eggnog %in% i) %>%
-  group_by(topphylum, eggnog, env) %>% summarise(cpm = sum(cpm), .groups = 'drop') %>%
-  # Call plot
-  ggplot(aes(x = cpm, 
-             y = fct_relevel(eggnog, i),
-             fill = fct_relevel(topphylum, c('Other')))) +
-  labs(x = 'Counts per million', y = '') +
-  facet_wrap(~ env, labeller = label_wrap_gen(width = 40)) +
-  geom_col() +
-  scale_fill_manual(values = cols) +
-  scale_x_continuous(labels = c(0, expression(0.5 %*% 10^5), expression(10^5),
-                                expression(1.5 %*% 10^5),""), n.breaks = 6, expand = c(0.002,0)) +
-  scale_y_discrete(labels = function(x) str_wrap(x, width = 25)) +
-  theme_tidy(ratio = 2.0) + 
-  theme(panel.border = element_blank(),
-        legend.position = c(.9,.7),
-        strip.text = element_text(face = "bold"),
-        axis.text.y = element_text(face = "plain", size = 6),
-        axis.text.x = element_text(face = "bold"),
-        legend.spacing.x = unit(0.5, "mm"),
-        legend.key.size = unit(3.5, "mm"),
-        axis.ticks.y.left = element_line(),
-        axis.line.x.bottom = element_line(colour = "black"),
-        axis.line.y.left = element_line(colour = "black"))
 
 seqcpm %>%
   inner_join(taxref, by = 'geneid') %>%
@@ -668,19 +643,19 @@ seqcpm %>%
 ```
 
 
-```{r Fig. 5 export barplot eggnog}
-ggsave("figures/fig_5.pdf", height = 10, width = 16, units = "cm")
-ggsave("figures/fig_5.png", height = 10, width = 16, units = "cm")
+```{r Fig. s3 export barplot eggnog}
+ggsave("figures/fig_s3.pdf", height = 10, width = 16, units = "cm")
+ggsave("figures/fig_s3.png", height = 10, width = 16, units = "cm")
 ```
 
 
-## Fig. 7: Differential gene expression using EdgeR
+## Fig. 5: Differential gene expression using EdgeR
 
 
 ```{r differential expression}
 library(edgeR)
 rnatab %>% spread(sample, count, fill = 0) %>% column_to_rownames('geneid') -> d
-DGEList(d, group = smd$treat) -> d
+DGEList(d, group = smd$treat %>% na.omit()) -> d
 
 # Filter based on cpm
 keep <- filterByExpr(d)
@@ -742,7 +717,7 @@ i <- c("Translation, ribosomal structure and biogenesis","Cell wall/membrane/env
        "Energy production and conversion","Cell motility","Posttranslational modification, protein turnover, chaperones","Signal transduction mechanisms",
        "Amino acid transport and metabolism",
        "Replication, recombination and repair","Carbohydrate transport and metabolism",
-       "Cytoskeleton")
+       "Intracellular trafficking, secretion, and vesicular transport")
 
 seqcpm %>%
   filter(geneid %in% diffexp$geneid) %>%
@@ -803,8 +778,8 @@ seqcpm %>%
 
 
 ```{r export plot DE eggnogs}
-ggsave('figures/fig_7.pdf', height = 10, width = 16, units = 'cm')
-ggsave('figures/fig_7.png', height = 10, width = 16, units = 'cm')
+ggsave('figures/fig_5.pdf', height = 10, width = 16, units = 'cm')
+ggsave('figures/fig_5.png', height = 10, width = 16, units = 'cm')
 ```
 
 
@@ -812,7 +787,11 @@ ggsave('figures/fig_7.png', height = 10, width = 16, units = 'cm')
 ncbi %>% 
   filter(kingdom == "Fungi") %>% 
   inner_join(seqcpm, by = "geneid") %>%
+  mutate(rank = substr(rank, start = 1, stop = 1)) %>%
+  mutate(taxon = paste(taxon, " (", rank, ")", sep = "")) %>%
   group_by(sample, taxon) %>% summarise(cpm = sum(cpm), .groups = "drop") %>%
+  #mutate(rank = substr(rank, start = 1, stop = 1)) %>%
+  #mutate(taxon = paste(taxon, " (", rank, ")", sep = "")) %>%
   ggplot(aes(x = cpm, 
              y = fct_rev(fct_relevel(sample, c("P10152_S2","P10152_S3"))),
              fill = taxon)) +
@@ -820,40 +799,26 @@ ncbi %>%
   geom_col() +
   scale_fill_brewer(palette = 'Paired') +
   coord_cartesian(clip = "off") +
-  scale_x_continuous(labels = function(x) format(x, scientific = TRUE)) +
-  theme_tidy() +
-  geom_text(aes(label = "TM planktonic", x = 8.25e3, y = 1), hjust = 0, size = 2.0) +
-  geom_text(aes(label = "MM planktonic", x = 8.25e3, y = 2.5), hjust = 0, size = 2.0) +
-  geom_text(aes(label = "TM biofilm", x = 8.25e3, y = 4.5), hjust = 0, size = 2.0) +
-  geom_text(aes(label = "MM biofilm", x = 8.25e3, y = 6.5), hjust = 0, size = 2.0) +
+  scale_x_continuous(labels = function(x) format(x, scientific = TRUE), expand = c(0.004,0)) +
+  annotate(geom = "text", x = 8.25e3, y = 1, hjust = 0, size = 6/.pt, label = "TM planktonic") +
+  annotate(geom = "text", x = 8.25e3, y = 2.5, hjust = 0, size = 6/.pt, label = "MM planktonic") +
+  annotate(geom = "text", x = 8.25e3, y = 4.5, hjust = 0, size = 6/.pt, label = "TM biofilm") +
+  annotate(geom = "text", x = 8.25e3, y = 6.5, hjust = 0, size = 6/.pt, label = "MM biofilm") +
   annotate(x = 8.2e3, xend = 8.2e3, y = 0.55, yend = 1.45, lwd = 0.5, geom = "segment") +
   annotate(x = 8.2e3, xend = 8.2e3, y = 1.55, yend = 3.45, lwd = 0.5, geom = "segment") +
   annotate(x = 8.2e3, xend = 8.2e3, y = 3.55, yend = 5.45, lwd = 0.5, geom = "segment") +
   annotate(x = 8.2e3, xend = 8.2e3, y = 5.55, yend = 7.45, lwd = 0.5, geom = "segment") +
-  theme(panel.border = element_blank(),
-        legend.spacing.x = unit(0.5, "mm"),
-        legend.key.size = unit(4.0, "mm"),
-        axis.text.y = element_text(size = 6.0),
-        axis.ticks.y.left = element_line(),
-        axis.line.x.bottom = element_line(colour = "black"),
-        axis.line.y.left = element_line(colour = "black"))
+  theme_clean(ratio = 1.4) +
+  theme(legend.spacing.x = unit(0.5, "mm"),
+        panel.grid.major.y = element_blank(),
+        legend.key.size = unit(3.5, "mm"),
+        axis.line.x.bottom = element_line(colour = "black")
+  )
 ```
 
 
 ```{r export barplot fungi}
-ggsave("figures/fungi.pdf", height = 12, width = 14, units = "cm")
-ggsave("figures/fungi.png", height = 12, width = 14, units = "cm")
+ggsave("figures/fig_s4.pdf", height = 10, width = 10, units = "cm")
+ggsave("figures/fig_s4.png", height = 10, width = 10, units = "cm")
 ```
-
-```{r}
-seqtab %>%
-  # Filter out very low abundant ASVs
-  group_by(seqid) %>% filter(count > 10) %>% ungroup() %>%
-  select(-relab) %>% spread(sample, count, fill = 0) %>%
-  column_to_rownames('seqid') %>%
-  ALDEx2::aldex(conditions = smd %>% arrange(sample) %>% filter(!is.na(age)) %>% pull(nature)) %>%
-  rownames_to_column("seqid") %>%
-  inner_join(tax) -> aldex
-```
-
 
