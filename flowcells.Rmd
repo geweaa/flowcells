@@ -822,3 +822,105 @@ ggsave("figures/fig_s4.pdf", height = 10, width = 10, units = "cm")
 ggsave("figures/fig_s4.png", height = 10, width = 10, units = "cm")
 ```
 
+
+```{r prepare plot eggnogs}
+cols <- c("Other" = "#a6cee3", "Unidentified" = "#d9d9d9",
+          "Acholeplasmatales" = "#969696", "Bacillales" = "#b15928", "Burkholderiales" = "#1f78b4",
+          "Campylobacterales" = "#33a02c", "Desulfobacterales" = "#e31a1c",
+          "Methanobacteriales" = "#ff7f00",
+          "Nitrosomonadales" = "#fdbf6f", "Rhizobiales" = "#cab2d6",
+          "Rhodocyclales" = "#6a3d9a", "Trichomonadida" = "#ffff99")
+
+i <- c("Translation, ribosomal structure and biogenesis","Cell wall/membrane/envelope biogenesis",
+       "Energy production and conversion","Cell motility","Posttranslational modification, protein turnover, chaperones","Signal transduction mechanisms",
+       "Amino acid transport and metabolism",
+       "Replication, recombination and repair","Carbohydrate transport and metabolism",
+       "Intracellular trafficking, secretion, and vesicular transport")
+
+seqcpm %>%
+  inner_join(ncbi, by = "geneid") %>%
+  group_by(order, sample) %>%
+  # Sum the abundance of each phylum within a category
+  summarise(cpm = sum(cpm), .groups = "drop_last") %>%
+  # Calculate the mean abundance of each phylum over the categories
+  summarise(mean_relab = sum(cpm), .groups = 'drop') %>%
+  filter(!is.na(order)) %>%
+  top_n(10, mean_relab) -> t
+
+ncbi %>%
+  left_join(t %>% transmute(order, topphylum = order), by = "order") %>%
+  mutate(topphylum = if_else(is.na(order), "Unidentified", topphylum)) %>%
+  replace_na(list("topphylum" = "Other")) -> taxref
+```
+
+
+```{r plot significant eggnogs}
+seqcpm %>%
+  inner_join(smd, by = "sample") %>%
+  inner_join(taxref, by = 'geneid') %>%
+  inner_join(eggnogs, by = "geneid") %>% filter(eggnog %in% i) %>%
+  mutate(aquifer = paste(designation, nature)) %>%
+  group_by(topphylum, eggnog, aquifer) %>% summarise(cpm = sum(cpm), .groups = "drop") %>%
+  ggplot(aes(x = cpm, 
+             y = fct_relevel(eggnog, i),
+             fill = fct_relevel(topphylum, c('Other','Unidentified')) %>% fct_rev()
+             )
+         ) +
+  labs(x = expression(bold('Counts per million (' %*% '1000)')), y = '') +
+  facet_wrap(~ aquifer, nrow = 1, ncol = 4) +
+  geom_col() +
+  scale_fill_manual(values = cols) +
+  scale_x_continuous(labels = c(expression(bold("0")),expression(bold("50")),expression(bold("100")),
+                                expression(bold("150")), expression(bold("200"))), 
+                    n.breaks = 5, expand = c(0.004,0)) +  
+  scale_y_discrete(labels = function(x) str_wrap(x, width = 25)) +
+  theme_tidy(ratio = 3.4) + 
+  theme(panel.border = element_blank(),
+        strip.background = element_rect(size = 0,fill = "#f0f0f0"),
+        axis.ticks.y = element_blank(),
+        legend.position = c(1,0.72),
+        strip.text = element_text(face = "bold"),
+        axis.text.y = element_text(face = "plain", size = 6, colour = "black"),
+        axis.text.x = element_text(face = "bold", size = 6),
+        legend.spacing.x = unit(0.5, "mm"),
+        legend.box.margin = margin(0,0,0,0),
+        legend.box.background = element_rect(size = .7, colour = "black"),
+        legend.key.size = unit(3.3, "mm"),
+        axis.line.x.bottom = element_line(colour = "black"))
+```
+
+
+```{r export plot eggnogs}
+ggsave('figures/fig_s5.pdf', height = 10, width = 16, units = 'cm')
+ggsave('figures/fig_s5.png', height = 10, width = 16, units = 'cm')
+```
+
+```{r}
+diffexp %>%
+  # Select significant DE genes
+  filter(diffexp != 0 & eggnog %in% i) %>%
+  mutate(logFC = logFC * -1) %>%
+  # Call plot
+  ggplot(aes(x = logFC, fct_relevel(eggnog, i))) +
+  labs(x = 'Log fold-change', y = '') + 
+  geom_violin() +
+  facet_wrap(~ aquifer, scales = "free_x") +
+  geom_vline(xintercept = 0, linetype = 'dotted') +
+  scale_y_discrete(labels = function(x) str_wrap(x, width = 25)) +
+  theme_tidy(ratio = 3.0) +
+  theme(panel.border = element_blank(),
+        strip.background = element_rect(size = 0,fill = "#f0f0f0"),
+        axis.ticks.y = element_blank(),
+        strip.text = element_text(face = "bold"),
+        axis.text.y = element_text(face = "plain", size = 6, colour = "black"),
+        axis.text.x = element_text(face = "bold", size = 6),
+        axis.line.x.bottom = element_line(colour = "black"))
+```
+
+
+```{r export violin plot}
+ggsave('figures/fig_s6.pdf', height = 10, width = 10, units = 'cm')
+ggsave('figures/fig_s6.png', height = 10, width = 10, units = 'cm')
+```
+```
+
