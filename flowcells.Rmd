@@ -106,7 +106,7 @@ qqPlot(stat$meandiv)
 # Homogeneity of variance using Levene (null hypothesis variance is equal)
 leveneTest(meandiv ~ env, data = stat)
 # Run ANOVA (null hypothesis diversity is equal)
-aov(meandiv ~ env, data = stat) %>% summary()
+aov(shannon ~ env, data = adiv) %>% summary()
 # Post-hoc
 aov(meandiv ~ env, data = stat) %>% TukeyHSD()
 ```
@@ -143,7 +143,7 @@ adiv %>%
 ```
 
 
-## Fig. 1b: NMDS on dataset DNA
+## Fig. 3b: NMDS on dataset DNA
 
 ```{r run nmds, results='hide'}
 seqtab %>%
@@ -201,15 +201,15 @@ nmds.scores %>%
 ```
 
 
-```{r Fig. 2}
+```{r Fig. 3}
 library(patchwork)
 a + b + plot_annotation(tag_levels = "a", tag_suffix = ")") &
   theme(plot.tag = element_text(size = 8, color = "black"))
 ```
 
-```{r export Fig. 2}
-ggsave("figures/fig_2.pdf", width = 16, height = 10, units = "cm")
-ggsave("figures/fig_2.png", width = 16, height = 10, units = "cm")
+```{r export Fig. 3}
+ggsave("figures/fig_3.pdf", width = 16, height = 10, units = "cm")
+ggsave("figures/fig_3.png", width = 16, height = 10, units = "cm")
 ```
 
 
@@ -236,7 +236,7 @@ pairwiseAdonis::pairwise.adonis(t[,c(-1)], factors = t$env)
 
 
 
-## Fig. 2:  Bar plot DNA
+## Fig. S2:  Bar plot DNA phylum
 
 
 ```{r bar plot DNA phylum}
@@ -276,27 +276,24 @@ ggsave("figures/fig_s2.png", height = 10, width = 12, units = "cm")
 
 
 ```{r barplot DNA genus}
-# Ralstonia (Burkholderiales), Immundisolibacter (Immundisolibacterales), Sulfurimonas (Campylobacterales),
-# Brevundimonas (Caulobacterales), Desulfatiferula (Desulfobacterales), Methylotenera (Nitrosomonadales),
-# Pseudomonas (Pseudomonadales), Hoeflea (Rhizobiales), Parvibaculum (Parvibaculales), 
-# Thiobacillus (Nitrosomonadales), Acidiphilium (Acetobacterales)
-
-cols <- c("Other" = "#a6cee3", "Ralstonia" = "#1f78b4","Immundisolibacter" = "#045a8d",
+cols <- c("Other" = "#a6cee3", "Unidentified" = "#d9d9d9",
+          "Ralstonia" = "#1f78b4","Immundisolibacter" = "#045a8d",
           "Sulfurimonas" = "#33a02c", "Brevundimonas" = "#fb9a99", "Desulfatiferula" = "#e31a1c",
           "Methylotenera" = "#a50f15","Thiobacillus" = "#fdbf6f","Parvibaculum" = "#ff7f00", 
-          "Pseudomonas" = "#efedf5", "Hoeflea" = "#cab2d6",
-          "Acidiphilium" = "#807dba")
+          "Pseudomonas" = "#efedf5")
 
-barplot(taxlevel = "genus", n = 12) %>%
+barplot(taxlevel = "genus", n = 10) %>%
   # Call the plot
   ggplot(aes(x = fct_relevel(env, c('TM-448.4 75d', 'TM-448.4 40d', 'TM-448.4 20d',
                                     'MM-171.3 75d', 'MM-171.3 40d', 'MM-171.3 20d',
                                     'TM-448.4', 'MM-171.3')),
              y = relab, 
-             fill = fct_relevel(topphylum, c("Other","Ralstonia","Immundisolibacter","Sulfurimonas",
+             fill = fct_relevel(topphylum, c("Other","Unidentified",
+                                             "Ralstonia","Immundisolibacter","Sulfurimonas",
                                              "Brevundimonas","Desulfatiferula","Methylotenera","Thiobacillus",
-                                             "Parvibaculum","Pseudomonas",
-                                             "Hoeflea","Acidiphilium")))) +
+                                             "Parvibaculum","Pseudomonas"))
+             )
+         ) +
   labs(x = '', y = 'Relative abundance (%)') +
   geom_col(width = 0.9) +
   scale_fill_manual(values = cols) +
@@ -306,7 +303,7 @@ barplot(taxlevel = "genus", n = 12) %>%
   annotate(geom = "segment", x = 6.55, xend = 8.45, y = -.01, yend = -.01) +
   annotate('text', x = 3.5, y = -0.06, size = 6 / .pt, label = "Biofilm", angle = 90, hjust = 0.5) +
   annotate('text', x = 7.5, y = -0.06, size = 6 / .pt, label = "Planktonic", angle = 90, hjust = 0.5) +
-  theme_barplot(ratio = 2) + 
+  theme_barplot(ratio = 2.4) + 
   theme(legend.key.size = unit(3, "mm"), 
         legend.text = element_text(size = 6), 
         #legend.margin = margin(0,0,0,0),
@@ -314,7 +311,7 @@ barplot(taxlevel = "genus", n = 12) %>%
         legend.position = "right",
         axis.line.x = element_line(),
         axis.text.y = element_blank(),
-        plot.margin = margin(4,0,4,0),
+        plot.margin = margin(4,8,4,0),
         plot.tag.position = c(.1,1.02)) -> a
 ```
 
@@ -374,7 +371,7 @@ barplot(taxlevel = "order", n = 12) %>%
   #annotate('text', x = 7.5, y = -0.06, size = 6 / .pt, label = "Planktonic", angle = 90, hjust = 0.5) +
   coord_flip(clip = "off") + 
   scale_y_continuous(trans = 'reverse', labels = c('100','75','50','25','0'), expand = c(0.004,0)) + 
-  theme_barplot(ratio = 2) + 
+  theme_barplot(ratio = 2.4) + 
   theme(legend.key.size = unit(3, "mm"),
         legend.spacing.x = unit(0, "mm"),
         legend.text = element_text(size = 6), 
@@ -387,19 +384,19 @@ barplot(taxlevel = "order", n = 12) %>%
 ```
 
 
-```{r Fig. 3}
+```{r Fig. 4}
 library(patchwork)
 
-c + b + a +
+c + a +
   plot_annotation(tag_levels = "a", tag_suffix = ")") +
   plot_layout(nrow = 1) &
   theme(plot.tag = element_text(size = 8, color = "black"), plot.tag.position = "top")
 ```
 
 
-```{r export Fig. 3}
-ggsave("figures/fig_3.pdf", height = 10, width = 18, units = "cm")
-ggsave("figures/fig_3.png", height = 10, width = 18, units = "cm")
+```{r export Fig. 4}
+ggsave("figures/fig_4.pdf", height = 10, width = 16, units = "cm")
+ggsave("figures/fig_4.png", height = 10, width = 16, units = "cm")
 ```
 
 
@@ -425,7 +422,7 @@ read_tsv('taxa.tsv', col_types = cols(.default = col_character())) -> ncbi
 ```
 
 
-## Fig. 4a: NMDS on Bray-Curtis dissimilarities (RNA)
+## Fig. 5a: NMDS on Bray-Curtis dissimilarities (RNA)
 
 
 Transform the genecounts
@@ -438,13 +435,13 @@ rnatab %>%
   column_to_rownames("sample") -> t
 
 set.seed(999)
-t %>%  vegan::metaMDS(trymax = 50, k = 2, autotransform = T) -> nmds
+t %>%  vegan::metaMDS(trymax = 20, k = 2, autotransform = T) -> nmds
 ```
 
 Extract the scores
 
 ```{r nmds.scores RNA}
-vegan::scores(nmds) %>%
+vegan::scores(nmds)$sites %>%
   as.data.frame() %>%
   rownames_to_column("sample") %>%
   inner_join(smd, by = "sample") -> nmds.scores
@@ -476,11 +473,12 @@ nmds.scores %>%
   geom_vline(xintercept = 0, linetype = 'dotted') +
   geom_hline(yintercept = 0, linetype = 'dotted') +
   theme_tidy() +
-  theme(legend.spacing.x = unit(0.0, "mm")) -> a
+  theme(legend.spacing.x = unit(0.0, "mm"),
+        plot.margin = margin(0,8,0,0)) -> a
 ```
 
 
-## Fig. 4b: Barplot mRNA
+## Fig. 5b: Barplot mRNA
 
 Transform absolute counts to counts per million (cpm) which is the relative abundance within each sample.
 
@@ -509,7 +507,7 @@ seqcpm %>%
   # Calculate the mean abundance of each phylum over the categories
   summarise(mean_relab = sum(cpm), .groups = 'drop') %>%
   filter(!is.na(order)) %>%
-  top_n(12, mean_relab) -> t
+  top_n(10, mean_relab) -> t
 
 ncbi %>%
   left_join(t %>% transmute(order, topphylum = order), by = "order") %>%
@@ -537,7 +535,7 @@ seqcpm %>%
   # Call plot
   ggplot(aes(x = fct_rev(env), 
              y = cpm, 
-             fill = fct_relevel(topphylum, c('Other', 'Unidentified')))) +
+             fill = fct_relevel(topphylum, c('Other','Unidentified')))) +
   labs(y = expression(bold('Counts per million (' %*% '1000)')), x = '') +
   scale_y_continuous(labels = c(expression(bold("1000")), expression(bold("750")), expression(bold("500")), expression(bold("250")), expression(bold("0"))), 
                      trans = 'reverse', expand = c(0.002,0)) +
@@ -548,22 +546,22 @@ seqcpm %>%
   coord_flip() + 
   annotate('text', x = 1, y = 430000, size = 2, label = "41% Thiobacillaceae") +
   annotate('text', x = 3, y = 430000, size = 2, label = "34% Desulfobacteraceae") +
-  theme_barplot(ratio = 1) + 
+  theme_barplot(ratio = 1.2) + 
   guides(fill = guide_legend(nrow = 5)) +
   theme(legend.key.size = unit(3.3, "mm"),
         axis.line.x = element_line()) -> b
 ```
 
 
-```{r Fig. 4}
+```{r Fig. 5}
 library(patchwork)
 a + b + plot_annotation(tag_levels = "a", tag_suffix = ")") &
   theme(plot.tag = element_text(size = 8, color = "black"))
 ```
 
-```{r export Fig. 4}
-ggsave("figures/fig_4.pdf", height = 10, width = 16, units = "cm")
-ggsave("figures/fig_4.png", height = 10, width = 16, units = "cm")
+```{r export Fig. 5}
+ggsave("figures/fig_5.pdf", height = 10, width = 16, units = "cm")
+ggsave("figures/fig_5.png", height = 10, width = 16, units = "cm")
 ```
 
 
@@ -576,76 +574,6 @@ rnatab %>%
   column_to_rownames("sample") -> t
 
 vegan::adonis(t[,c(-1)] ~ nature, data = t)
-```
-
-
-
-```{r Fig. s3 barplot biofilm order level eggnog}
-i <- c("Translation, ribosomal structure and biogenesis","Cell wall/membrane/envelope biogenesis",
-       "Energy production and conversion","Cell motility","Posttranslational modification, protein turnover, chaperones","Signal transduction mechanisms",
-       "Amino acid transport and metabolism",
-       "Replication, recombination and repair","Carbohydrate transport and metabolism",
-       "Cytoskeleton")
-
-cols <- c("Other" = "#a6cee3","Unidentified" = "#d9d9d9", "Acholeplasmatales" = "#969696",
-          "Burkholderiales" = "#1f78b4",
-          "Campylobacterales" = "#33a02c", "Clostridiales" = "#b2df8a", "Desulfobacterales" = "#e31a1c",
-          "Methanobacteriales" = "#ff7f00",
-          "Nitrosomonadales" = "#fdbf6f", "Rhizobiales" = "#cab2d6",
-          "Rhodocyclales" = "#6a3d9a", "Trichomonadida" = "#ffff99")
-
-seqcpm %>%
-  inner_join(ncbi, by = "geneid") %>%
-  group_by(order, sample) %>%
-  # Sum the abundance of each phylum within a category
-  summarise(cpm = sum(cpm), .groups = "drop_last") %>%
-  # Calculate the mean abundance of each phylum over the categories
-  summarise(mean_relab = sum(cpm), .groups = 'drop') %>%
-  filter(!is.na(order)) %>%
-  top_n(10, mean_relab) -> t
-
-ncbi %>%
-  left_join(t %>% transmute(order, topphylum = order), by = "order") %>%
-  mutate(topphylum = if_else(is.na(order), "Unidentified", topphylum)) %>%
-  replace_na(list("topphylum" = "Other")) %>%
-  inner_join(eggnogs, by = "geneid") -> taxref
-
-seqcpm %>%
-  inner_join(taxref, by = 'geneid') %>%
-  filter(eggnog %in% i) %>%
-  inner_join(smd, by = "sample") %>%
-  mutate(designation = paste(designation,nature)) %>%
-  group_by(topphylum, eggnog, designation) %>% summarise(cpm = sum(cpm), .groups = "drop") %>%
-  ggplot(aes(x = cpm, 
-             y = fct_relevel(eggnog, i),
-             fill = fct_relevel(topphylum, c('Other','Unidentified')) %>% fct_rev()
-             )
-         ) +
-  labs(x = expression(bold('Counts per million (' %*% '1000)')), y = '') +
-  facet_wrap(~ designation, nrow = 1, ncol = 4) +
-  geom_col() +
-  scale_fill_manual(values = cols) +
-  scale_x_continuous(labels = c("0","50","100","150",""), n.breaks = 5, expand = c(0.004,0)) +  
-  scale_y_discrete(labels = function(x) str_wrap(x, width = 25)) +
-  theme_tidy(ratio = 3.4) + 
-  theme(panel.border = element_blank(),
-        strip.background = element_rect(size = 0,fill = "#f0f0f0"),
-        axis.ticks.y = element_blank(),
-        legend.position = c(1,0.72),
-        strip.text = element_text(face = "bold"),
-        axis.text.y = element_text(face = "plain", size = 6, colour = "black"),
-        axis.text.x = element_text(face = "bold", size = 6),
-        legend.spacing.x = unit(0.5, "mm"),
-        legend.box.margin = margin(0,0,0,0),
-        legend.box.background = element_rect(size = .7, colour = "black"),
-        legend.key.size = unit(3.3, "mm"),
-        axis.line.x.bottom = element_line(colour = "black"))
-```
-
-
-```{r Fig. s3 export barplot eggnog}
-ggsave("figures/fig_s3.pdf", height = 10, width = 16, units = "cm")
-ggsave("figures/fig_s3.png", height = 10, width = 16, units = "cm")
 ```
 
 
@@ -713,11 +641,12 @@ cols <- c("Other" = "#a6cee3", "Unidentified" = "#d9d9d9",
           "Nitrosomonadales" = "#fdbf6f", "Rhizobiales" = "#cab2d6",
           "Rhodocyclales" = "#6a3d9a", "Trichomonadida" = "#ffff99")
 
-i <- c("Translation, ribosomal structure and biogenesis","Cell wall/membrane/envelope biogenesis",
-       "Energy production and conversion","Cell motility","Posttranslational modification, protein turnover, chaperones","Signal transduction mechanisms",
+i <- c("Translation, ribosomal structure and biogenesis","Energy production and conversion",
+       "Cell motility","Posttranslational modification, protein turnover, chaperones",
        "Amino acid transport and metabolism",
        "Replication, recombination and repair","Carbohydrate transport and metabolism",
-       "Intracellular trafficking, secretion, and vesicular transport")
+       "Intracellular trafficking, secretion, and vesicular transport","Signal transduction mechanisms",
+       "Cell wall/membrane/envelope biogenesis")
 
 seqcpm %>%
   filter(geneid %in% diffexp$geneid) %>%
@@ -778,8 +707,8 @@ seqcpm %>%
 
 
 ```{r export plot DE eggnogs}
-ggsave('figures/fig_5.pdf', height = 10, width = 16, units = 'cm')
-ggsave('figures/fig_5.png', height = 10, width = 16, units = 'cm')
+ggsave('figures/fig_6.pdf', height = 10, width = 16, units = 'cm')
+ggsave('figures/fig_6.png', height = 10, width = 16, units = 'cm')
 ```
 
 
@@ -818,8 +747,8 @@ ncbi %>%
 
 
 ```{r export barplot fungi}
-ggsave("figures/fig_s4.pdf", height = 10, width = 10, units = "cm")
-ggsave("figures/fig_s4.png", height = 10, width = 10, units = "cm")
+ggsave("figures/fig_s3.pdf", height = 10, width = 10, units = "cm")
+ggsave("figures/fig_s3.png", height = 10, width = 10, units = "cm")
 ```
 
 
@@ -830,12 +759,6 @@ cols <- c("Other" = "#a6cee3", "Unidentified" = "#d9d9d9",
           "Methanobacteriales" = "#ff7f00",
           "Nitrosomonadales" = "#fdbf6f", "Rhizobiales" = "#cab2d6",
           "Rhodocyclales" = "#6a3d9a", "Trichomonadida" = "#ffff99")
-
-i <- c("Translation, ribosomal structure and biogenesis","Cell wall/membrane/envelope biogenesis",
-       "Energy production and conversion","Cell motility","Posttranslational modification, protein turnover, chaperones","Signal transduction mechanisms",
-       "Amino acid transport and metabolism",
-       "Replication, recombination and repair","Carbohydrate transport and metabolism",
-       "Intracellular trafficking, secretion, and vesicular transport")
 
 seqcpm %>%
   inner_join(ncbi, by = "geneid") %>%
@@ -854,7 +777,7 @@ ncbi %>%
 ```
 
 
-```{r plot significant eggnogs}
+```{r plot eggnogs orders}
 seqcpm %>%
   inner_join(smd, by = "sample") %>%
   inner_join(taxref, by = 'geneid') %>%
@@ -891,36 +814,61 @@ seqcpm %>%
 
 
 ```{r export plot eggnogs}
-ggsave('figures/fig_s5.pdf', height = 10, width = 16, units = 'cm')
-ggsave('figures/fig_s5.png', height = 10, width = 16, units = 'cm')
-```
-
-```{r}
-diffexp %>%
-  # Select significant DE genes
-  filter(diffexp != 0 & eggnog %in% i) %>%
-  mutate(logFC = logFC * -1) %>%
-  # Call plot
-  ggplot(aes(x = logFC, fct_relevel(eggnog, i))) +
-  labs(x = 'Log fold-change', y = '') + 
-  geom_violin() +
-  facet_wrap(~ aquifer, scales = "free_x") +
-  geom_vline(xintercept = 0, linetype = 'dotted') +
-  scale_y_discrete(labels = function(x) str_wrap(x, width = 25)) +
-  theme_tidy(ratio = 3.0) +
-  theme(panel.border = element_blank(),
-        strip.background = element_rect(size = 0,fill = "#f0f0f0"),
-        axis.ticks.y = element_blank(),
-        strip.text = element_text(face = "bold"),
-        axis.text.y = element_text(face = "plain", size = 6, colour = "black"),
-        axis.text.x = element_text(face = "bold", size = 6),
-        axis.line.x.bottom = element_line(colour = "black"))
+ggsave('figures/fig_s4.pdf', height = 10, width = 16, units = 'cm')
+ggsave('figures/fig_s4.png', height = 10, width = 16, units = 'cm')
 ```
 
 
-```{r export violin plot}
-ggsave('figures/fig_s6.pdf', height = 10, width = 10, units = 'cm')
-ggsave('figures/fig_s6.png', height = 10, width = 10, units = 'cm')
-```
-```
+```{r Redox}
+# Reduction
+prokka %>%
+  filter(EC_number %in% c("2.7.7.4","1.8.99.5") | 
+           product %in% c("Adenylylsulfate reductase subunit alpha",
+                          "Adenylylsulfate reductase subunit beta",
+                          "Anaerobic sulfite reductase subunit A",
+                          "Anaerobic sulfite reductase subunit B") | 
+           COG %in% c("COG0243","COG4117","COG0243")) %>% 
+  select(geneid, product) %>% 
+  mutate(redox = "S red. / disp.") -> sulfur
 
+# Oxidation
+prokka %>% 
+  filter(EC_number %in% c("2.7.7.4","2.8.5.2") | 
+           COG %in% c("COG3302","COG0243","COG0437","COG0446")) %>% 
+  select(geneid, product) %>% 
+  mutate(redox = "S oxidation") %>%
+  rbind(sulfur) %>%
+  inner_join(seqcpm, by = "geneid") %>% 
+  inner_join(smd, by = "sample") %>%
+  group_by(sample, redox) %>%
+  summarise(cpm = sum(cpm), .groups = "drop") -> sulfur
+
+sulfur %>%
+  inner_join(smd, by = "sample") %>%
+  group_by(env, redox) %>%
+  summarise(mean = sum(cpm) / 2, sd = sd(cpm), .groups = "drop") %>%
+  ggplot(aes(x = mean, 
+             y = fct_rev(env), 
+             fill = redox, 
+             group = redox)) +
+  geom_errorbar(aes(xmin = mean-sd, xmax = mean+sd), 
+                width = 0.2, colour = "black",
+                position = position_dodge(0.5)) +
+  geom_col(position = "dodge", width = .5) +
+  labs(x = expression(bold('Counts per million (' %*% '1000)')), y = '') +
+  scale_fill_manual(values = c("S red. / disp." = "#525252",
+                               "S oxidation" = "#d9d9d9")) +
+  scale_x_continuous(expand = c(0.004,0), n.breaks = 4,
+                     limits = c(0,30000),
+                     labels = c("0","10","20","30")) +
+  theme_clean(ratio = 1.8, fontsize = 8) +
+  theme(axis.title.y.left = element_blank(),
+        panel.grid.major.y = element_blank(),
+        legend.key.size = unit(3.5, "mm"),
+        legend.text = element_text(size = 8),
+        legend.position = c(.85,.9))
+```
+```{r export redox}
+ggsave('figures/fig_s5.pdf', height = 10, width = 8.5, units = 'cm')
+ggsave('figures/fig_s5.png', height = 10, width = 8.5, units = 'cm')
+```
