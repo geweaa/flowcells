@@ -181,8 +181,8 @@ hulls <- plyr::ddply(t, "nature", find_hull)
 nmds.scores %>%
   # Prepare data
   mutate(age = gsub("d"," d",age)) %>%
-  mutate(age = ifelse(nature == "Planktonic" & age == "before", "Mar 2016", age)) %>%
-  mutate(age = ifelse(nature == "Planktonic" & age == "after", "Apr 2017", age)) %>%
+  mutate(age = ifelse(nature == "Planktonic" & age == "before", "b", age)) %>%
+  mutate(age = ifelse(nature == "Planktonic" & age == "after", "a", age)) %>%
   # Plot
   ggplot(aes(x = NMDS1, y = NMDS2, fill = nature)) +
   geom_polygon(data = hulls, alpha = .3) +
@@ -191,9 +191,7 @@ nmds.scores %>%
   # Labelled according to groundwater type
   scale_color_manual(values = c(Biofilm = "#08519c", Planktonic = "#9ecae1")) +
   scale_fill_manual(values = c(Biofilm = "#08519c", Planktonic = "#9ecae1")) +
-  #scale_color_grey() + 
-  #scale_fill_grey() +
-  annotate('text', x = Inf, y = -Inf, size = 6/.pt, 
+  annotate('text', x = Inf, y = -Inf, size = 7/.pt, 
            label = paste('Stress = ', round(nmds$stress, digits = 2)),
            hjust = 1.1, vjust = -1, fontface = "bold"
            ) +
@@ -516,7 +514,7 @@ seqcpm %>%
   # Calculate the mean abundance of each phylum over the categories
   summarise(mean_relab = sum(cpm), .groups = 'drop') %>%
   filter(!is.na(order)) %>%
-  top_n(10, mean_relab) -> t
+  top_n(12, mean_relab) -> t
 
 ncbi %>%
   left_join(t %>% transmute(order, topphylum = order), by = "order") %>%
@@ -535,8 +533,10 @@ cols <- c("Unidentified" = "#f0f0f0",
           "Rhodocyclales" = "#a50f15", # Beta
           "Desulfobacterales" = "#b2df8a", # Delta
           "Campylobacterales" = "#cab2d6", # Epsilon
+          "Enterobacterales" = "#6a3d9a", # Gamma
           "Acholeplasmatales" = "#fdbf6f", # Firmicutes
-          "Clostridiales" = "#ff7f00", # Firmicutes
+          "Bacillales" = "#ff7f00", # Firmicutes
+          "Clostridiales" = "#B35900", # Firmicutes
           "Methanobacteriales" = "#dfc27d",
           "Trichomonadida" = "#8c510a")
 
@@ -555,7 +555,8 @@ seqcpm %>%
                                              "Burkholderiales","Nitrosomonadales","Rhodocyclales",
                                              "Desulfobacterales",
                                              "Campylobacterales",
-                                             "Acholeplasmatales","Clostridiales"))
+                                             "Enterobacterales",
+                                             "Acholeplasmatales","Bacillales","Clostridiales"))
              )
          ) +
   labs(y = expression(bold('Counts per million (' %*% '1000)')), x = '') +
@@ -577,7 +578,7 @@ seqcpm %>%
   annotate('text', x = 2.5, y = -40000, size = 7 / .pt, label = "TM-448.4", angle = 90, hjust = 0.5, fontface = "bold") +
   annotate('text', x = 6.5, y = -40000, size = 7 / .pt, label = "MM-171.3", angle = 90, hjust = 0.5, fontface = "bold") +
   theme_barplot(ratio = 1.2, fontsize = 7) + 
-  guides(fill = guide_legend(nrow = 6)) +
+  guides(fill = guide_legend(nrow = 7)) +
   theme(legend.key.size = unit(3, "mm"),
         legend.text = element_text(size = 7),
         axis.line.x = element_line()) -> b
@@ -591,8 +592,8 @@ a + b + plot_annotation(tag_levels = "a", tag_suffix = ")") &
 ```
 
 ```{r export Fig. 5}
-ggsave("figures/fig_5.pdf", height = 12, width = 18, units = "cm")
-ggsave("figures/fig_5.png", height = 12, width = 18, units = "cm")
+ggsave("figures/fig_5x.pdf", height = 12, width = 18, units = "cm")
+ggsave("figures/fig_5x.png", height = 12, width = 18, units = "cm")
 ```
 
 
