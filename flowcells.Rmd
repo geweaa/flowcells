@@ -59,12 +59,7 @@ read_tsv('seqtab.tsv', col_types = cols(.default = col_character(), count = col_
   # Filter out samples with less than 1000 reads
   group_by(sample) %>% filter(sum(count) > 1000) %>%
   # Calculate relative abundance within sample
-  mutate(relab = count / sum(count)) %>% ungroup() %>%
-  # Average the relative abundance within an environment by dividing by the total
-  inner_join(smd, by = 'sample') %>%
-  mutate(env = if_else(nature == "Planktonic", as.vector(env), paste(env,age))) %>%
-  group_by(env) %>% mutate(relab = relab / sum(relab)) %>% ungroup() %>%
-  select(sample, seqid, count, relab) -> seqtab
+  mutate(relab = count / sum(count)) %>% ungroup() -> seqtab
 ```
 
 
@@ -125,24 +120,24 @@ adiv %>%
   geom_boxplot(outlier.color = "white") +
   geom_jitter(width = 0.01, stroke = 0.8, size = 1, fill = "white", shape = 21, height = 0.1) +
   labs(x = "Alpha diversity (Shannon index)", y = "") +
-  scale_x_continuous(limits = c(1,6), expand = c(0.004,0), breaks = ) +
+  scale_x_continuous(limits = c(1,6), n.breaks = 4) +
   scale_y_discrete(labels = 
                      c("Biofilm TM-448.4","Planktonic TM-448.4","Biofilm MM-171.3","Planktonic MM-171.3")
                    ) +
-  ggrepel::geom_text_repel(aes(label = age), color = "black",
+  ggrepel::geom_text_repel(aes(label = gsub(".[1-2]","",age)), color = "black",
                   box.padding = 0.3, 
                   max.overlaps = 10,
                   min.segment.length = 0.4,
-                  size = 6/.pt) +
-  annotate('text', x = 6, y = 4, size = 7 / .pt, label = "bold(italic(n)) == 12", parse = TRUE) +
-  annotate('text', x = 5.07, y = 3, size = 7 / .pt, label = "bold(italic(n) == 6)", parse = TRUE) +
-  annotate('text', x = 5.37, y = 2, size = 7 / .pt, label = "bold(italic(n) == 12)", parse = T) +
-  annotate('text', x = 5.13, y = 1, size = 7 / .pt, label = "bold(italic(n) == 6)", parse = T) +
+                  size = 7/.pt) +
+  annotate('text', x = 5.9, y = 4, size = 7 / .pt, label = "bold(italic(n)) == 12", parse = TRUE) +
+  annotate('text', x = 5.9, y = 3, size = 7 / .pt, label = "bold(italic(n) == 6)", parse = TRUE) +
+  annotate('text', x = 5.9, y = 2, size = 7 / .pt, label = "bold(italic(n) == 12)", parse = T) +
+  annotate('text', x = 5.9, y = 1, size = 7 / .pt, label = "bold(italic(n) == 6)", parse = T) +
   coord_cartesian(clip = "off") +
-  theme_clean(ratio = 1.6, fontsize = 7) +
+  theme_tidy(ratio = 1.4, fontsize = 7) +
   theme(plot.tag.position = c(.2,1.01),
-        plot.margin = margin(0,12,0,0),
-        panel.grid.major.y = element_blank(),
+        axis.ticks.y = element_blank(),
+        panel.border = element_rect(),
         panel.grid.major.x = element_line(linetype = "dotted", color = "grey", size = 0.3),
         axis.text.y.left = element_text(face = "bold"))  -> a
 ```
@@ -180,7 +175,7 @@ hulls <- plyr::ddply(t, "nature", find_hull)
 
 nmds.scores %>%
   # Prepare data
-  mutate(age = gsub("d"," d",age)) %>%
+  mutate(age = gsub("d.[1-2]"," d",age)) %>%
   mutate(age = ifelse(nature == "Planktonic" & age == "before", "b", age)) %>%
   mutate(age = ifelse(nature == "Planktonic" & age == "after", "a", age)) %>%
   # Plot
@@ -191,9 +186,9 @@ nmds.scores %>%
   # Labelled according to groundwater type
   scale_color_manual(values = c(Biofilm = "#08519c", Planktonic = "#9ecae1")) +
   scale_fill_manual(values = c(Biofilm = "#08519c", Planktonic = "#9ecae1")) +
-  annotate('text', x = Inf, y = -Inf, size = 7/.pt, 
+  annotate('text', x = -Inf, y = -Inf, size = 7/.pt, 
            label = paste('Stress = ', round(nmds$stress, digits = 2)),
-           hjust = 1.1, vjust = -1, fontface = "bold"
+           hjust = -0.1, vjust = -1, fontface = "bold"
            ) +
   ggrepel::geom_text_repel(aes(label = age), color = "black",
                   box.padding = 0.3, 
@@ -210,13 +205,13 @@ nmds.scores %>%
 
 ```{r Fig. 3}
 library(patchwork)
-a + b + plot_annotation(tag_levels = "a", tag_suffix = ")") &
+a + b + plot_annotation(tag_levels = "a") &
   theme(plot.tag = element_text(size = 8, color = "black"))
 ```
 
 ```{r export Fig. 3}
-ggsave("figures/fig_3.pdf", width = 18, height = 12, units = "cm")
-ggsave("figures/fig_3.png", width = 18, height = 12, units = "cm")
+ggsave("figures/fig_3.pdf", width = 20, height = 12, units = "cm")
+ggsave("figures/fig_3.png", width = 20, height = 12, units = "cm")
 ```
 
 
@@ -247,165 +242,263 @@ pairwiseAdonis::pairwise.adonis(t[,c(-1)], factors = t$env)
 
 
 ```{r bar plot DNA phylum}
-cols <- c("Unidentified" = "#f0f0f0",
-          'Other' = '#bdbdbd',
-          'Alphaproteobacteria' = '#a6cee3',
-          'Betaproteobacteria' = '#1f78b4',
-          'Deltaproteobacteria' = '#b2df8a', 
-          'Epsilonproteobacteria' = '#33a02c',
-          'Gammaproteobacteria' = '#fb9a99',
-          'Actinobacteria' = '#e31a1c', 
-          'Bacteroidetes' = '#fdbf6f', 
-          'Chloroflexi' = '#ff7f00',
-          "Omnitrophicaeota" = '#cab2d6',
-          'Patescibacteria' = '#6a3d9a', 
+cols <- c("Unidentified" = "#a6cee3",
+          'Other' = '#1f78b4',
+          'Alphaproteobacteria' = '#b2df8a',
+          'Betaproteobacteria' = '#33a02c',
+          'Deltaproteobacteria' = '#fb9a99', 
+          'Epsilonproteobacteria' = '#e31a1c',
+          'Gammaproteobacteria' = '#fdbf6f',
+          'Bacteroidetes' = '#ff7f00', 
+          'Chloroflexi' = '#cab2d6',
+          "Omnitrophicaeota" = '#6a3d9a',
+          'Patescibacteria' = '#ffff99', 
           'Spirochaetes' = '#b15928')
 
-barplot() %>%
-  mutate(env =  gsub("d", " d", env)) %>%
+seqtab %>%
+  inner_join(tax, by = "seqid") %>%
+  mutate(phylum = if_else(phylum == "Proteobacteria", class, phylum)) %>%
+  group_by(phylum, sample) %>%
+  # Sum the abundance of each phylum within a sample
+  summarise(relab = sum(relab), .groups = 'drop_last') %>%
+  # Calculate the mean abundance of each phylum over the categories
+  summarise(mean_relab = sum(relab), .groups = 'drop') %>%
+  filter(!is.na(phylum) & phylum != "uncultured bacterium") %>%
+  top_n(10, mean_relab) -> t
+
+tax %>%
+  mutate(phylum = if_else(phylum == "Proteobacteria", class, phylum)) %>%
+  left_join(t %>% transmute(phylum, topphylum = phylum), by = "phylum") %>%
+  mutate(topphylum = if_else(is.na(phylum), "Unidentified", topphylum)) %>%
+  replace_na(list("topphylum" = "Other")) -> taxref
+
+seqtab %>%
+  inner_join(smd, by = "sample") %>%
+  inner_join(taxref, by = "seqid") %>%
+  mutate(sample = ifelse(nature == "Planktonic" & designation == "MM-171.3","QL-1679-S01",sample)) %>%
+  mutate(sample = ifelse(nature == "Planktonic" & designation == "TM-448.4","QL-1679-S05",sample)) %>%
+  mutate(relab = ifelse(nature == "Planktonic",relab/12,relab)) %>%
+  # Summarize in order to have the sum for each category and topphylum
+  group_by(sample, topphylum) %>% 
+  summarise(relab = sum(relab), .groups = 'drop_last') %>%
   # Call the plot
-  ggplot(aes(x = fct_relevel(env, c('TM-448.4 75 d', 'TM-448.4 40 d', 'TM-448.4 20 d',
-                                    'MM-171.3 75 d', 'MM-171.3 40 d', 'MM-171.3 20 d',
-                                    'TM-448.4', 'MM-171.3')),
-             y = relab, 
+  ggplot(aes(x = fct_relevel(sample, samples),
+             y = relab * 100, 
              fill = fct_relevel(topphylum, c("Unidentified","Other",
-                                             "Alphaproteobacteria",
-                                             "Betaproteobacteria",
-                                             "Deltaproteobacteria",
-                                             "Epsilonproteobacteria",
-                                             "Gammaproteobacteria")))) +
-  labs(x = '', y = 'Relative abundance (%)') +
-  geom_col(width = 0.9) +
+                                             "Alphaproteobacteria","Betaproteobacteria","Deltaproteobacteria",
+                                             "Epsilonproteobacteria","Gammaproteobacteria")
+                                )
+             )
+         ) +
+  labs(x = '', y = 'Relative abundance (%)', fill = "Phylum") +
+  geom_col() +
   scale_fill_manual(values = cols) +
-  annotate(geom = "segment", x = .55, xend = 6.45, y = -.01, yend = -.01) +
-  annotate(geom = "segment", x = 6.55, xend = 8.45, y = -.01, yend = -.01) +
-  annotate('text', x = 3.5, y = -0.03, size = 7 / .pt, label = "Biofilm", angle = 90, hjust = 0.5, fontface = "bold") +
-  annotate('text', x = 7.5, y = -0.03, size = 7 / .pt, label = "Planktonic", angle = 90, hjust = 0.5, fontface = "bold") +
-  coord_flip(clip = "off") + 
-  scale_y_continuous(trans = 'reverse', labels = c('100','75','50','25','0'), expand = c(0.004,0)) +
-  theme_barplot(ratio = 1.4, fontsize = 7) + 
-  theme(legend.position = "right", axis.line.x = element_line())
+  annotate("segment", x =  2.55, xend =  4.45, y = 101, yend = 101) +
+  annotate("segment", x =  4.55, xend =  6.45, y = 101, yend = 101) +
+  annotate("segment", x =  6.55, xend =  8.45, y = 101, yend = 101) +
+  annotate("segment", x =  8.55, xend = 10.45, y = 101, yend = 101) +
+  annotate("segment", x = 10.55, xend = 12.45, y = 101, yend = 101) +
+  annotate("segment", x = 12.55, xend = 14.45, y = 101, yend = 101) +
+  annotate('text', x =  1, y = 103, size = 7 / .pt, label = "MM", hjust = 0.5, fontface = "bold") +
+  annotate('text', x =  2, y = 103, size = 7 / .pt, label = "TM", hjust = 0.5, fontface = "bold") +
+  annotate('text', x =  3.5, y = 103, size = 7 / .pt, label = "MM 20 d", hjust = 0.5, fontface = "bold") +
+  annotate('text', x =  5.5, y = 103, size = 7 / .pt, label = "40 d", hjust = 0.5, fontface = "bold") +
+  annotate('text', x =  7.5, y = 103, size = 7 / .pt, label = "75 d", hjust = 0.5, fontface = "bold") +
+  annotate('text', x =  9.5, y = 103, size = 7 / .pt, label = "TM 20 d", hjust = 0.5, fontface = "bold") +
+  annotate('text', x = 11.5, y = 103, size = 7 / .pt, label = "40 d", hjust = 0.5, fontface = "bold") +
+  annotate('text', x = 13.5, y = 103, size = 7 / .pt, label = "75 d", hjust = 0.5, fontface = "bold") +
+  theme_barplot(fontsize = 7) + 
+  theme(axis.ticks.x = element_blank(), axis.text.x = element_blank(),
+        axis.ticks.y = element_line(), plot.margin = margin(0,0,0,0),
+        axis.text.y = element_text(face = "bold"),
+        legend.position = "right", legend.title = element_text(face = "bold", size = 7),
+        panel.border = element_rect(size = 1, fill = NA)
+        ) #-> a
 ```
 
 
 ```{r export barplot DNA phylum}
-ggsave("figures/fig_s3.pdf", height = 10, width = 12, units = "cm")
-ggsave("figures/fig_s3.png", height = 10, width = 12, units = "cm")
+ggsave("figures/fig_s3.pdf", height = 10, width = 16, units = "cm")
+ggsave("figures/fig_s3.png", height = 10, width = 16, units = "cm")
 ```
 
 
 ```{r barplot DNA order}
-cols <- c("Unidentified" = "#f0f0f0",
-          "Other" = "#bdbdbd",
-          "Caulobacterales" = "#a6cee3",
-          "Rhizobiales" = "#1f78b4", # Alpha
-          "Burkholderiales" = "#fff5f0",
-          "Nitrosomonadales" = "#fc9272", # Beta
-          "Desulfobacterales" = "#b2df8a",
-          "SAR324 clade" = "#33a02c",  # Delta
-          "Campylobacterales" = "#cab2d6", # Epsilon
-          "Pseudomonadales" = "#fdbf6f", # Gamma
-          "Ca. Falkowbacteria" = "#6a3d9a",
-          "Spirochaetales" = "#ffff99")
+cols <- c("Unidentified" = "#a6cee3",
+          "Other" = "#1f78b4",
+          "Caulobacterales" = "#b2df8a", # Alpha
+          "Parvibaculales" = "#33a02c", # Alpha
+          "Rhizobiales" = "#fb9a99", # Alpha
+          "Burkholderiales" = "#e31a1c", # Beta
+          "Nitrosomonadales" = "#fdbf6f", # Beta
+          "Desulfobacterales" = "#ff7f00", # Delta
+          "Desulfovibrionales" = "#cab2d6", # Delta
+          "SAR324 clade" = "#6a3d9a",  # Delta
+          "Ca. Falkowbacteria" = "#ffff99",
+          "Spirochaetales" = "#b15928")
 
-barplot(taxlevel = "order", n = 11) %>%
-  mutate(env = gsub("d"," d", env)) %>%
+samples <- c("QL-1679-S01",
+             "QL-1679-S05",
+             "QL-1679-S81","QL-1679-S82","QL-1679-S71","QL-1679-S72","QL-1679-S77","QL-1679-S78",
+             "QL-1679-S75","QL-1679-S76","QL-1679-S73","QL-1679-S74","QL-1679-S79","QL-1679-S80"
+             )
+
+
+seqtab %>%
+  inner_join(tax, by = "seqid") %>%
+  group_by(order, sample) %>%
+  # Sum the abundance of each phylum within a sample
+  summarise(relab = sum(relab), .groups = 'drop_last') %>%
+  # Calculate the mean abundance of each phylum over the categories
+  summarise(mean_relab = sum(relab), .groups = 'drop') %>%
+  filter(!is.na(order) & order != "uncultured bacterium") %>%
+  top_n(10, mean_relab) -> t
+
+tax %>%
+  left_join(t %>% transmute(order, topphylum = order), by = "order") %>%
+  mutate(topphylum = if_else(is.na(order), "Unidentified", topphylum)) %>%
+  replace_na(list("topphylum" = "Other")) -> taxref
+
+seqtab %>%
+  inner_join(smd, by = "sample") %>%
+  inner_join(taxref, by = "seqid") %>%
+  mutate(sample = ifelse(nature == "Planktonic" & designation == "MM-171.3","QL-1679-S01",sample)) %>%
+  mutate(sample = ifelse(nature == "Planktonic" & designation == "TM-448.4","QL-1679-S05",sample)) %>%
+  mutate(relab = ifelse(nature == "Planktonic",relab/9,relab)) %>%
+  # Summarize in order to have the sum for each category and topphylum
+  group_by(sample, topphylum) %>% 
+  summarise(relab = sum(relab), .groups = 'drop_last') %>%
   mutate(topphylum = if_else(topphylum == "SAR324 clade(Marine group B)", "SAR324 clade", topphylum)) %>%
   mutate(topphylum = if_else(topphylum == "Candidatus Falkowbacteria", "Ca. Falkowbacteria", topphylum)) %>%
   # Call the plot
-  ggplot(aes(x = fct_relevel(env, c('TM-448.4 75 d', 'TM-448.4 40 d', 'TM-448.4 20 d',
-                                    'MM-171.3 75 d', 'MM-171.3 40 d', 'MM-171.3 20 d',
-                                    'TM-448.4', 'MM-171.3')),
-             y = relab, 
+  ggplot(aes(x = fct_relevel(sample, samples),
+             y = relab * 100, 
              fill = fct_relevel(topphylum, c("Unidentified","Other",
-                                             "Caulobacterales","Rhizobiales",
-                                             "Desulfobacterales","SAR324 clade",
-                                             "Campylobacterales",
-                                             "Burkholderiales","Nitrosomonadales","Pseudomonadales")))) +
-  labs(x = '', y = 'Relative abundance (%)') +
-  geom_col(width = 0.9) +
+                                             "Caulobacterales","Parvibaculales","Rhizobiales",
+                                             "Burkholderiales","Nitrosomonadales",
+                                             "Desulfobacterales","Desulfovibrionales","SAR324 clade"))
+             )
+         ) +
+  labs(x = '', y = 'Relative abundance (%)', fill = "Order") +
+  geom_col() +
   scale_fill_manual(values = cols) +
-  coord_flip(clip = "off") + 
-  scale_y_continuous(trans = 'reverse', labels = c('100','75','50','25','0'), expand = c(0.004,0)) + 
-  theme_barplot(ratio = 2.4, fontsize = 7) + 
-  theme(legend.key.size = unit(3, "mm"),
-        legend.spacing.x = unit(0, "mm"),
-        legend.text = element_text(size = 7), 
-        legend.box.margin = margin(0,0,0,0),
-        legend.position = "left",
-        axis.line.x = element_line(),
+  annotate("segment", x =  2.55, xend =  4.45, y = 101, yend = 101) +
+  annotate("segment", x =  4.55, xend =  6.45, y = 101, yend = 101) +
+  annotate("segment", x =  6.55, xend =  8.45, y = 101, yend = 101) +
+  annotate("segment", x =  8.55, xend = 10.45, y = 101, yend = 101) +
+  annotate("segment", x = 10.55, xend = 12.45, y = 101, yend = 101) +
+  annotate("segment", x = 12.55, xend = 14.45, y = 101, yend = 101) +
+  annotate('text', x =  1, y = 103, size = 7 / .pt, label = "MM", hjust = 0.5, fontface = "bold") +
+  annotate('text', x =  2, y = 103, size = 7 / .pt, label = "TM", hjust = 0.5, fontface = "bold") +
+  annotate('text', x =  3.5, y = 103, size = 7 / .pt, label = "MM 20 d", hjust = 0.5, fontface = "bold") +
+  annotate('text', x =  5.5, y = 103, size = 7 / .pt, label = "40 d", hjust = 0.5, fontface = "bold") +
+  annotate('text', x =  7.5, y = 103, size = 7 / .pt, label = "75 d", hjust = 0.5, fontface = "bold") +
+  annotate('text', x =  9.5, y = 103, size = 7 / .pt, label = "TM 20 d", hjust = 0.5, fontface = "bold") +
+  annotate('text', x = 11.5, y = 103, size = 7 / .pt, label = "40 d", hjust = 0.5, fontface = "bold") +
+  annotate('text', x = 13.5, y = 103, size = 7 / .pt, label = "75 d", hjust = 0.5, fontface = "bold") +
+  theme_barplot(fontsize = 7) + 
+  theme(axis.ticks.x = element_blank(), axis.text.x = element_blank(),
+        axis.ticks.y = element_line(), plot.margin = margin(0,0,0,0),
         axis.text.y = element_text(face = "bold"),
-        plot.margin = margin(4,12,4,0),
-        plot.tag.position = c(.1,1.02)) -> a
+        legend.position = "right", legend.title = element_text(face = "bold", size = 7),
+        panel.border = element_rect(size = 1, fill = NA)
+        ) -> a
 ```
 
 
 ```{r barplot DNA genus}
-cols <- c("Unidentified" = "#f0f0f0",
-          "Other" = "#bdbdbd",
-          "Brevundimonas" = "#a6cee3", # Caulobacterales (Alpha)
-          "Hoeflea" = "#1f78b4", # Rhizobiales (Alpha)
-          "Parvibaculum" = "#045a8d", # Parvibaculales (Alpha)
-          "Ralstonia" = "#fff5f0", # Burkholderiales (Beta)
-          "Methylotenera" = "#fee0d2", # Nitrosomonadales (Beta)
-          "Thiobacillus" = "#fc9272", # Nitrosomonadales (Beta)
-          "Desulfatiferula" = "#b2df8a", # Desulfobacterales (Delta)
-          "Sulfurimonas" = "#cab2d6", # Campylobacterales (Epsilon)
-          "Pseudomonas" = "#fdbf6f", # Pseudomonadales (Gamma)
-          "Immundisolibacter" = "#ff7f00" # Immundisolibacterales (Gammaproteobacteria)
+cols <- c("Unidentified" = "#a6cee3",
+          "Other" = "#1f78b4",
+          "Brevundimonas" = "#b2df8a", # Caulobacterales (Alpha)
+          "Parvibaculum" = "#33a02c", # Parvibaculales (Alpha)
+          "Filomicrobium" = "#fee0d2", # Rhizobiales (Alpha)
+          "Hoeflea" = "#fb9a99", # Rhizobiales (Alpha)
+          "Methylotenera" = "#e31a1c", # Nitrosomonadales (Beta)
+          "Thiobacillus" = "#fdbf6f", # Nitrosomonadales (Beta)
+          "Desulfatiferula" = "#ff7f00", # Desulfobacterales (Delta)
+          "Desulfurivibrio" = "#ffff99", # Desulfobacterales (Delta)
+          #"MSBL7" = "#ff7f00", # Desulfobacterales (Delta)
+          "Desulfocurvus" = "#cab2d6", # Desulfovibrionales (Delta)
+          #"Methylomicrobium" = "black", # Methylococcales (Gamma)
+          "Pseudomonas" = "#6a3d9a" # Pseudomonadales (Gamma)
           )
 
+seqtab %>%
+  inner_join(tax, by = "seqid") %>%
+  group_by(genus, sample) %>%
+  # Sum the abundance of each phylum within a sample
+  summarise(relab = sum(relab), .groups = 'drop_last') %>%
+  # Calculate the mean abundance of each phylum over the categories
+  summarise(mean_relab = sum(relab), .groups = 'drop') %>%
+  filter(!is.na(genus) & !grepl(pattern = "uncultured", x = genus)) %>%
+  top_n(10, mean_relab) %>%
+  mutate(genus = gsub("Methylomicrobium","Pseudomonas", genus)) %>%
+  mutate(genus = gsub("MSBL7","Hoeflea", genus)) -> t
 
-barplot(taxlevel = "genus", n = 11) %>%
+tax %>%
+  left_join(t %>% transmute(genus, topphylum = genus), by = "genus") %>%
+  mutate(topphylum = if_else(is.na(genus), "Unidentified", topphylum)) %>%
+  replace_na(list("topphylum" = "Other")) -> taxref
+
+seqtab %>%
+  inner_join(smd, by = "sample") %>%
+  inner_join(taxref, by = "seqid") %>%
+  mutate(sample = ifelse(nature == "Planktonic" & designation == "MM-171.3","QL-1679-S01",sample)) %>%
+  mutate(sample = ifelse(nature == "Planktonic" & designation == "TM-448.4","QL-1679-S05",sample)) %>%
+  mutate(relab = ifelse(nature == "Planktonic",relab/9,relab)) %>%
+  # Summarize in order to have the sum for each category and topphylum
+  group_by(sample, topphylum) %>% 
+  summarise(relab = sum(relab), .groups = 'drop_last') %>%
+  mutate(topphylum = if_else(topphylum == "SAR324 clade(Marine group B)", "SAR324 clade", topphylum)) %>%
+  mutate(topphylum = if_else(topphylum == "Candidatus Falkowbacteria", "Ca. Falkowbacteria", topphylum)) %>%
   # Call the plot
-  ggplot(aes(x = fct_relevel(env, c('TM-448.4 75d', 'TM-448.4 40d', 'TM-448.4 20d',
-                                    'MM-171.3 75d', 'MM-171.3 40d', 'MM-171.3 20d',
-                                    'TM-448.4', 'MM-171.3')),
-             y = relab, 
+  ggplot(aes(x = fct_relevel(sample, samples),
+             y = relab * 100, 
              fill = fct_relevel(topphylum, c("Unidentified","Other",
-                                             "Brevundimonas","Hoeflea","Parvibaculum",
-                                             "Ralstonia","Thiobacillus",
-                                             "Desulfatiferula","Methylotenera",
-                                             "Pseudomonas",
-                                             "Immundisolibacter","Sulfurimonas")
-                                )
+                                             "Brevundimonas","Parvibaculum","Filomicrobium","Hoeflea",
+                                             "Methylotenera","Thiobacillus",
+                                             "Desulfatiferula","Desulfurivibrio",
+                                             "Desulfocurvus","Pseudomonas")
+             )
              )
          ) +
-  labs(x = '', y = 'Relative abundance (%)') +
-  geom_col(width = 0.9) +
+  labs(x = '', y = 'Relative abundance (%)', fill = "Genus") +
+  geom_col() +
   scale_fill_manual(values = cols) +
-  coord_flip(clip = "off") + 
-  scale_y_continuous(trans = 'reverse', labels = c('100','75','50','25','0'), expand = c(0.004,0)) +
-  annotate(geom = "segment", x = .55, xend = 6.45, y = -.01, yend = -.01) +
-  annotate(geom = "segment", x = 6.55, xend = 8.45, y = -.01, yend = -.01) +
-  annotate('text', x = 3.5, y = -0.06, size = 7 / .pt, label = "Biofilm", angle = 90, hjust = 0.5, fontface = "bold") +
-  annotate('text', x = 7.5, y = -0.06, size = 7 / .pt, label = "Planktonic", angle = 90, hjust = 0.5, fontface = "bold") +
-  theme_barplot(ratio = 2.4, fontsize = 7) + 
-  theme(legend.key.size = unit(3, "mm"), 
-        legend.text = element_text(size = 7), 
-        #legend.margin = margin(0,0,0,0),
-        legend.box.margin = margin(0,0,0,0), 
-        legend.position = "right",
-        axis.line.x = element_line(),
-        axis.text.y = element_blank(),
-        plot.margin = margin(4,8,4,0),
-        plot.tag.position = c(.1,1.02)) -> b
+  annotate("segment", x =  2.55, xend =  4.45, y = 101, yend = 101) +
+  annotate("segment", x =  4.55, xend =  6.45, y = 101, yend = 101) +
+  annotate("segment", x =  6.55, xend =  8.45, y = 101, yend = 101) +
+  annotate("segment", x =  8.55, xend = 10.45, y = 101, yend = 101) +
+  annotate("segment", x = 10.55, xend = 12.45, y = 101, yend = 101) +
+  annotate("segment", x = 12.55, xend = 14.45, y = 101, yend = 101) +
+  annotate('text', x =  1, y = 103, size = 7 / .pt, label = "MM", hjust = 0.5, fontface = "bold") +
+  annotate('text', x =  2, y = 103, size = 7 / .pt, label = "TM", hjust = 0.5, fontface = "bold") +
+  annotate('text', x =  3.5, y = 103, size = 7 / .pt, label = "MM 20 d", hjust = 0.5, fontface = "bold") +
+  annotate('text', x =  5.5, y = 103, size = 7 / .pt, label = "40 d", hjust = 0.5, fontface = "bold") +
+  annotate('text', x =  7.5, y = 103, size = 7 / .pt, label = "75 d", hjust = 0.5, fontface = "bold") +
+  annotate('text', x =  9.5, y = 103, size = 7 / .pt, label = "TM 20 d", hjust = 0.5, fontface = "bold") +
+  annotate('text', x = 11.5, y = 103, size = 7 / .pt, label = "40 d", hjust = 0.5, fontface = "bold") +
+  annotate('text', x = 13.5, y = 103, size = 7 / .pt, label = "75 d", hjust = 0.5, fontface = "bold") +
+  theme_barplot(fontsize = 7) + 
+  theme(axis.ticks.x = element_blank(), axis.text.x = element_blank(),
+        axis.ticks.y = element_line(), plot.margin = margin(0,0,0,0),
+        axis.text.y = element_text(face = "bold"),
+        legend.position = "right", legend.title = element_text(face = "bold", size = 7),
+        panel.border = element_rect(size = 0.5, fill = NA)
+        ) -> b
 ```
 
 
 ```{r Fig. 4}
 library(patchwork)
 
-a + b +
-  plot_annotation(tag_levels = "a", tag_suffix = ")") +
-  plot_layout(nrow = 1) &
-  theme(plot.tag = element_text(size = 8, color = "black"), plot.tag.position = "top")
+a + b + plot_layout(nrow = 2)
 ```
 
 
 ```{r export Fig. 4}
-ggsave("figures/fig_4.pdf", height = 12, width = 18, units = "cm")
-ggsave("figures/fig_4.png", height = 12, width = 18, units = "cm")
+ggsave("figures/fig_4.pdf", height = 16, width = 16, units = "cm")
+ggsave("figures/fig_4.png", height = 16, width = 16, units = "cm")
 ```
 
 
@@ -481,7 +574,8 @@ nmds.scores %>%
   geom_hline(yintercept = 0, linetype = 'dotted') +
   theme_tidy(fontsize = 7) +
   theme(legend.spacing.x = unit(0.0, "mm"),
-        plot.margin = margin(0,8,0,0)) -> a
+        legend.box.spacing = unit(-0.5,"cm"),
+        plot.margin = margin(0,0,0,0)) -> a
 ```
 
 
@@ -519,26 +613,25 @@ seqcpm %>%
 ncbi %>%
   left_join(t %>% transmute(order, topphylum = order), by = "order") %>%
   mutate(topphylum = if_else(is.na(phylum), "Unidentified", topphylum)) %>%
-  mutate(topphylum = if_else(topphylum == "Proteobacteria", class, topphylum)) %>%
   replace_na(list("topphylum" = "Other")) -> taxref
 ```
 
 
 ```{r barplot mRNA order level}
-cols <- c("Unidentified" = "#f0f0f0",
-          "Other" = "#bdbdbd",
-          "Rhizobiales" = "#1f78b4", # Alpha
-          "Burkholderiales" = "#fff5f0", # Beta
-          "Nitrosomonadales" = "#fc9272", # Beta
-          "Rhodocyclales" = "#a50f15", # Beta
-          "Desulfobacterales" = "#b2df8a", # Delta
-          "Campylobacterales" = "#cab2d6", # Epsilon
-          "Enterobacterales" = "#6a3d9a", # Gamma
-          "Acholeplasmatales" = "#fdbf6f", # Firmicutes
-          "Bacillales" = "#ff7f00", # Firmicutes
-          "Clostridiales" = "#B35900", # Firmicutes
-          "Methanobacteriales" = "#dfc27d",
-          "Trichomonadida" = "#8c510a")
+cols <- c("Unidentified" = "#a6cee3",
+          "Other" = "#1f78b4",
+          "Rhizobiales" = "#fb9a99", # Alpha
+          "Burkholderiales" = "#e31a1c", # Beta
+          "Nitrosomonadales" = "#fdbf6f", # Beta
+          "Rhodocyclales" = "#ffff99", # Beta
+          "Desulfobacterales" = "#ff7f00", # Delta
+          "Campylobacterales" = "#b2df8a", # Epsilon
+          "Enterobacterales" = "#33a02c", # Gamma
+          "Acholeplasmatales" = "#00441b", # Firmicutes
+          "Bacillales" = "#cab2d6", # Firmicutes
+          "Clostridiales" = "#6a3d9a", # Firmicutes
+          "Methanobacteriales" = "#bf812d",
+          "Trichomonadida" = "#b15928")
 
 seqcpm %>%
   inner_join(taxref, by = "geneid") %>%
@@ -547,8 +640,8 @@ seqcpm %>%
   # Summarize in order to have the sum for each category and topphylum
   group_by(sample, topphylum) %>% summarise(cpm = sum(cpm), .groups = "drop") %>%
   # Call plot
-  ggplot(aes(x = fct_relevel(sample, c('P10152_S1','P10152_S4','P4056_101','P4056_102',
-                                       'P10152_S3','P10152_S2')), 
+  ggplot(aes(x = fct_relevel(sample, c('P4055_101','P4055_102','P10152_S2','P10152_S3',
+                                       'P4056_101','P4056_102','P10152_S1','P10152_S4')), 
              y = cpm, 
              fill = fct_relevel(topphylum, c('Unidentified','Other',
                                              "Rhizobiales",
@@ -559,41 +652,44 @@ seqcpm %>%
                                              "Acholeplasmatales","Bacillales","Clostridiales"))
              )
          ) +
-  labs(y = expression(bold('Counts per million (' %*% '1000)')), x = '') +
-  scale_y_continuous(labels = c(expression(bold("1000")), 
-                                expression(bold("750")), 
-                                expression(bold("500")), 
+  labs(y = expression(bold('Counts per million (' %*% '1000)')), x = '', fill = "Order") +
+  scale_y_continuous(labels = c(expression(bold("0")), 
                                 expression(bold("250")), 
-                                expression(bold("0"))), 
-                     trans = 'reverse', expand = c(0.002,0)) +
-  scale_x_discrete(labels = c("Biofilm\n2/2","Biofilm\n1/2","Planktonic\n2/2","Planktonic\n1/2",
-                              "Biofilm\n2/2","Biofilm\n1/2","Planktonic\n2/2","Planktonic\nrep. 1/2")) +
+                                expression(bold("500")), 
+                                expression(bold("750")), 
+                                expression(bold("1000"))), 
+                     ) +
   geom_col() +
   scale_fill_manual(values = cols) +
-  coord_flip(clip = "off") + 
-  annotate('text', x = 1, y = 400000, size = 6/.pt, label = "52% Thiobacillus", fontface = "bold") +
-  #annotate('text', x = 6, y = 350000, size = 1.8, label = "37% Desulfobacteraceae", fontface = "bold") +
-  annotate(geom = "segment", x = .55, xend = 4.45, y = -10000, yend = -10000) +
-  annotate(geom = "segment", x = 4.55, xend = 8.45, y = -10000, yend = -10000) +
-  annotate('text', x = 2.5, y = -40000, size = 7 / .pt, label = "TM-448.4", angle = 90, hjust = 0.5, fontface = "bold") +
-  annotate('text', x = 6.5, y = -40000, size = 7 / .pt, label = "MM-171.3", angle = 90, hjust = 0.5, fontface = "bold") +
-  theme_barplot(ratio = 1.2, fontsize = 7) + 
-  guides(fill = guide_legend(nrow = 7)) +
+  annotate(geom = "segment", x = .55, xend = 2.45, y = 1.01e6, yend = 1.01e6) +
+  annotate(geom = "segment", x = 2.55, xend = 4.45, y = 1.01e6, yend = 1.01e6) +
+  annotate(geom = "segment", x = 4.55, xend = 6.45, y = 1.01e6, yend = 1.01e6) +
+  annotate(geom = "segment", x = 6.55, xend = 8.45, y = 1.01e6, yend = 1.01e6) +
+  annotate('text', x = 1.5, y = 1.03e6, size = 7 / .pt, label = "MM planktonic", hjust = 0.5) +
+  annotate('text', x = 3.5, y = 1.03e6, size = 7 / .pt, label = "MM biofilm",hjust = 0.5) +
+  annotate('text', x = 5.5, y = 1.03e6, size = 7 / .pt, label = "TM planktonic",hjust = 0.5) +
+  annotate('text', x = 7.5, y = 1.03e6, size = 7 / .pt, label = "TM biofilm",hjust = 0.5) +
+  theme_barplot(ratio = 1, fontsize = 7) + 
+  guides(fill = guide_legend(nrow = 5)) +
   theme(legend.key.size = unit(3, "mm"),
-        legend.text = element_text(size = 7),
-        axis.line.x = element_line()) -> b
+        panel.border = element_rect(size = 0.5, fill = NA),
+        legend.box.spacing = unit(-2,"cm"),
+        plot.margin = margin(0,0,0,4),
+        axis.text.x = element_blank(), axis.ticks.x = element_blank(),
+        axis.ticks.y = element_line(),
+        legend.text = element_text(size = 7), legend.title = element_text(size = 7)
+        ) -> b
 ```
 
 
 ```{r Fig. 5}
 library(patchwork)
-a + b + plot_annotation(tag_levels = "a", tag_suffix = ")") &
-  theme(plot.tag = element_text(size = 8, color = "black"))
+a + b
 ```
 
 ```{r export Fig. 5}
-ggsave("figures/fig_5x.pdf", height = 12, width = 18, units = "cm")
-ggsave("figures/fig_5x.png", height = 12, width = 18, units = "cm")
+ggsave("figures/fig_5.pdf", height = 12, width = 18, units = "cm")
+ggsave("figures/fig_5.png", height = 12, width = 18, units = "cm")
 ```
 
 
@@ -666,18 +762,19 @@ Fig. 6 and 7: please organise the y-axis according to function by grouping these
 
 
 ```{r prepare plot DE eggnogs}
-cols <- c("Unidentified" = "#f0f0f0",
-          "Other" = "#bdbdbd",
-          "Rhizobiales" = "#1f78b4", # Alpha
-          "Burkholderiales" = "#fff5f0", # Beta
-          "Nitrosomonadales" = "#fc9272", # Beta
-          "Rhodocyclales" = "#a50f15", # Beta
-          "Desulfobacterales" = "#b2df8a", # Delta
-          "Campylobacterales" = "#cab2d6", # Epsilon
-          "Acholeplasmatales" = "#fdbf6f", # Tenericutes
-          "Bacillales" = "#ff7f00", # Firmictues
-          "Methanobacteriales" = "#dfc27d", 
-          "Trichomonadida" = "#8c510a")
+cols <- c("Unidentified" = "#a6cee3",
+          "Other" = "#1f78b4",
+          "Rhizobiales" = "#fb9a99", # Alpha
+          "Burkholderiales" = "#e31a1c", # Beta
+          "Nitrosomonadales" = "#fdbf6f", # Beta
+          "Rhodocyclales" = "#ffff99", # Beta
+          "Desulfobacterales" = "#ff7f00", # Delta
+          "Campylobacterales" = "#b2df8a", # Epsilon
+          "Acholeplasmatales" = "#00441b", # Firmicutes
+          "Bacillales" = "#cab2d6", # Firmicutes
+          "Methanobacteriales" = "#bf812d",
+          "Trichomonadida" = "#b15928")
+
 
 i <- c("Translation, ribosomal structure and biogenesis","Energy production and conversion",
        "Cell motility","Posttranslational modification, protein turnover, chaperones",
@@ -708,7 +805,7 @@ ncbi %>%
 seqcpm %>%
   inner_join(diffexp, by = "geneid") %>% filter(diffexp != 0 & eggnog %in% i) %>%
   inner_join(taxref, by = 'geneid') %>%
-  mutate(diffexp = if_else(diffexp == 1, "Planktonic", "Biofilm")) %>%
+  mutate(diffexp = if_else(diffexp == 1, "planktonic", "biofilm")) %>%
   mutate(aquifer = paste(aquifer, diffexp)) %>%
   group_by(topphylum, eggnog, aquifer) %>% summarise(cpm = sum(cpm), .groups = "drop") %>%
   ggplot(aes(x = cpm, 
@@ -720,7 +817,7 @@ seqcpm %>%
                                              "Campylobacterales")) %>% fct_rev()
              )
          ) +
-  labs(x = expression(bold('Counts per million (' %*% '1000)')), y = '') +
+  labs(x = expression(bold('Counts per million (' %*% '1000)')), y = '', fill = "Order") +
   facet_wrap(~ aquifer, nrow = 1, ncol = 4) +
   geom_col() +
   scale_fill_manual(values = cols) +
@@ -741,7 +838,7 @@ seqcpm %>%
         axis.text.y = element_text(face = "plain", size = 6, colour = "black"),
         axis.text.x = element_text(face = "bold", size = 6),
         legend.spacing.x = unit(0.5, "mm"),
-        legend.box.margin = margin(0,0,0,0),
+        legend.box.margin = margin(0,0,0,0), legend.title = element_text(size = 6),
         legend.box.background = element_rect(size = .7, colour = "black"),
         legend.key.size = unit(3.3, "mm"),
         axis.line.x.bottom = element_line(colour = "black"))
@@ -755,58 +852,66 @@ ggsave('figures/fig_6.png', height = 10, width = 16, units = 'cm')
 
 
 ```{r fungi}
+ls <- list(sample = "P4056_102", taxon = "Fungi (kingdom)", cpm = 0)
+
 ncbi %>% 
   filter(kingdom == "Fungi") %>% 
   inner_join(seqcpm, by = "geneid") %>%
-  mutate(rank = substr(rank, start = 1, stop = 1)) %>%
   mutate(taxon = paste(taxon, " (", rank, ")", sep = "")) %>%
   group_by(sample, taxon) %>% summarise(cpm = sum(cpm), .groups = "drop") %>%
-  #mutate(rank = substr(rank, start = 1, stop = 1)) %>%
-  #mutate(taxon = paste(taxon, " (", rank, ")", sep = "")) %>%
-  ggplot(aes(x = cpm, 
-             y = fct_rev(fct_relevel(sample, c("P10152_S2","P10152_S3"))),
-             fill = taxon)) +
-  labs(x = 'Counts per million', y = '') +
+  rbind(ls) %>%
+  ggplot(aes(x = fct_relevel(sample, c('P4055_101','P4055_102','P10152_S2','P10152_S3',
+                                       'P4056_101','P4056_102','P10152_S1','P10152_S4')), 
+             y = cpm, 
+             fill = taxon
+             )
+         ) +
+  labs(y = 'Counts per million', x = '', fill = "Taxon") +
   geom_col() +
   scale_fill_brewer(palette = 'Paired') +
-  coord_cartesian(clip = "off") +
-  scale_x_continuous(labels = function(x) format(x, scientific = TRUE), expand = c(0.004,0)) +
-  annotate(geom = "text", x = 8.25e3, y = 1, hjust = 0, size = 6/.pt, label = "TM planktonic") +
-  annotate(geom = "text", x = 8.25e3, y = 2.5, hjust = 0, size = 6/.pt, label = "MM planktonic") +
-  annotate(geom = "text", x = 8.25e3, y = 4.5, hjust = 0, size = 6/.pt, label = "TM biofilm") +
-  annotate(geom = "text", x = 8.25e3, y = 6.5, hjust = 0, size = 6/.pt, label = "MM biofilm") +
-  annotate(x = 8.2e3, xend = 8.2e3, y = 0.55, yend = 1.45, lwd = 0.5, geom = "segment") +
-  annotate(x = 8.2e3, xend = 8.2e3, y = 1.55, yend = 3.45, lwd = 0.5, geom = "segment") +
-  annotate(x = 8.2e3, xend = 8.2e3, y = 3.55, yend = 5.45, lwd = 0.5, geom = "segment") +
-  annotate(x = 8.2e3, xend = 8.2e3, y = 5.55, yend = 7.45, lwd = 0.5, geom = "segment") +
-  theme_clean(ratio = 1.4) +
-  theme(legend.spacing.x = unit(0.5, "mm"),
-        panel.grid.major.y = element_blank(),
-        legend.key.size = unit(3.5, "mm"),
-        axis.line.x.bottom = element_line(colour = "black")
+  scale_y_continuous(n.breaks = 4, labels = c("0","3,000","6,000","0")) +
+  annotate(geom = "text", x = 1.5, y = 8.4e3, size = 7/.pt, label = "MM planktonic") +
+  annotate(geom = "text", x = 3.5, y = 8.4e3, size = 7/.pt, label = "MM biofilm") +
+  annotate(geom = "text", x = 5.5, y = 8.4e3, size = 7/.pt, label = "TM planktonic") +
+  annotate(geom = "text", x = 7.5, y = 8.4e3, size = 7/.pt, label = "TM biofilm") +
+  annotate(x = 0.55, xend = 2.45, y = 8.2e3, yend = 8.2e3, geom = "segment") +
+  annotate(x = 2.55, xend = 4.45, y = 8.2e3, yend = 8.2e3, geom = "segment") +
+  annotate(x = 4.55, xend = 6.45, y = 8.2e3, yend = 8.2e3, geom = "segment") +
+  annotate(x = 6.55, xend = 8.45, y = 8.2e3, yend = 8.2e3, geom = "segment") +
+  theme_barplot(fontsize = 7) + 
+  theme(legend.key.size = unit(3, "mm"),
+        axis.text.y = element_text(face = "bold"),
+        panel.grid.major.y = element_line(linetype = "dotted", colour = "grey", size = 0.5),
+        legend.position = "right",
+        panel.border = element_rect(fill = NA),
+        plot.margin = margin(0,0,0,4),
+        axis.text.x = element_blank(), axis.ticks.x = element_blank(),
+        axis.ticks.y = element_line(),
+        legend.text = element_text(size = 7), legend.title = element_text(size = 7)
   )
 ```
 
 
 ```{r export barplot fungi}
-ggsave("figures/fig_s3.pdf", height = 10, width = 10, units = "cm")
-ggsave("figures/fig_s3.png", height = 10, width = 10, units = "cm")
+ggsave("figures/fig_s4.pdf", height = 8, width = 14, units = "cm")
+ggsave("figures/fig_s4.png", height = 8, width = 14, units = "cm")
 ```
 
 
 ```{r prepare plot eggnogs}
-cols <- c("Unidentified" = "#f0f0f0",
-          "Other" = "#bdbdbd",
-          "Rhizobiales" = "#1f78b4", # Alpha
-          "Burkholderiales" = "#fff5f0", # Beta
-          "Nitrosomonadales" = "#fc9272", # Beta
-          "Rhodocyclales" = "#a50f15", # Beta
-          "Desulfobacterales" = "#b2df8a", # Delta
-          "Campylobacterales" = "#cab2d6", # Epsilon
-          "Acholeplasmatales" = "#fdbf6f", # Tenericutes
-          "Bacillales" = "#ff7f00", # Firmictues
-          "Methanobacteriales" = "#dfc27d", 
-          "Trichomonadida" = "#8c510a")
+cols <- c("Unidentified" = "#a6cee3",
+          "Other" = "#1f78b4",
+          "Rhizobiales" = "#fb9a99", # Alpha
+          "Burkholderiales" = "#e31a1c", # Beta
+          "Nitrosomonadales" = "#fdbf6f", # Beta
+          "Rhodocyclales" = "#ffff99", # Beta
+          "Desulfobacterales" = "#ff7f00", # Delta
+          "Campylobacterales" = "#b2df8a", # Epsilon
+          "Acholeplasmatales" = "#00441b", # Firmicutes
+          "Bacillales" = "#cab2d6", # Firmicutes
+          "Methanobacteriales" = "#bf812d",
+          "Trichomonadida" = "#b15928")
+
 
 seqcpm %>%
   inner_join(ncbi, by = "geneid") %>%
@@ -830,7 +935,7 @@ seqcpm %>%
   inner_join(smd, by = "sample") %>%
   inner_join(taxref, by = 'geneid') %>%
   inner_join(eggnogs, by = "geneid") %>% filter(eggnog %in% i) %>%
-  mutate(aquifer = paste(designation, nature)) %>%
+  mutate(aquifer = paste(designation, tolower(nature))) %>%
   group_by(topphylum, eggnog, aquifer) %>% summarise(cpm = sum(cpm), .groups = "drop") %>%
   ggplot(aes(x = cpm, 
              y = fct_relevel(eggnog, i),
@@ -864,10 +969,9 @@ seqcpm %>%
         axis.line.x.bottom = element_line(colour = "black"))
 ```
 
-
 ```{r export plot eggnogs}
-ggsave('figures/fig_s4.pdf', height = 10, width = 16, units = 'cm')
-ggsave('figures/fig_s4.png', height = 10, width = 16, units = 'cm')
+ggsave('figures/fig_s6.pdf', height = 10, width = 16, units = 'cm')
+ggsave('figures/fig_s6.png', height = 10, width = 16, units = 'cm')
 ```
 
 
@@ -901,28 +1005,33 @@ sulfur %>%
   inner_join(smd, by = "sample") %>%
   group_by(env, redox) %>%
   summarise(mean = sum(cpm) / 2, sd = sd(cpm), .groups = "drop") %>%
-  ggplot(aes(x = mean, 
-             y = fct_rev(env), 
+  ggplot(aes(x = env, 
+             y = mean, 
              fill = redox, 
              group = redox)) +
-  geom_errorbar(aes(xmin = mean-sd, xmax = mean+sd), 
+  geom_errorbar(aes(ymin = mean-sd, ymax = mean+sd), 
                 width = 0.2, colour = "black",
                 position = position_dodge(0.5)) +
   geom_col(position = "dodge", width = .5) +
-  labs(x = expression(bold('Counts per million (' %*% '1000)')), y = '') +
-  scale_fill_manual(values = c("S red. / disp." = "#525252",
-                               "S oxidation" = "#d9d9d9")) +
-  scale_x_continuous(expand = c(0.004,0), n.breaks = 4,
+  labs(y = expression(bold('Counts per million (' %*% '1000)')), x = '') +
+  scale_fill_manual(values = c("S oxidation" = "#d9d9d9", 
+                               "S red. / disp." = "#525252")
+                    ) +
+  scale_y_continuous(n.breaks = 4,
                      limits = c(0,30000),
                      labels = c("0","10","20","30")) +
-  theme_clean(ratio = 1.2, fontsize = 8) +
-  theme(axis.title.y.left = element_blank(),
-        panel.grid.major.y = element_blank(),
-        legend.key.size = unit(3.5, "mm"),
-        legend.text = element_text(size = 8),
-        legend.position = c(.8,.85))
+  scale_x_discrete(labels = c("MM planktonic","MM biofilm",
+                              "TM planktonic","TM biofilm")) +
+  theme_clean(ratio = 1, fontsize = 7) +
+  theme(axis.ticks.y = element_line(),
+        panel.border = element_rect(fill = NA),
+        panel.grid.major.y = element_line(linetype = "dotted"),
+        legend.text = element_text(size = 7),
+        legend.position = "right"
+        )
 ```
+
 ```{r export redox}
-ggsave('figures/fig_s5.pdf', height = 8.5, width = 8.5, units = 'cm')
-ggsave('figures/fig_s5.png', height = 8.5, width = 8.5, units = 'cm')
+ggsave('figures/fig_s5.pdf', height = 10, width = 12, units = 'cm')
+ggsave('figures/fig_s5.png', height = 10, width = 12, units = 'cm')
 ```
