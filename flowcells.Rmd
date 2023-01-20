@@ -129,10 +129,10 @@ adiv %>%
                   max.overlaps = 10,
                   min.segment.length = 0.4,
                   size = 7/.pt) +
-  annotate('text', x = 5.9, y = 4, size = 7 / .pt, label = "bold(italic(n)) == 12", parse = TRUE) +
-  annotate('text', x = 5.9, y = 3, size = 7 / .pt, label = "bold(italic(n) == 6)", parse = TRUE) +
-  annotate('text', x = 5.9, y = 2, size = 7 / .pt, label = "bold(italic(n) == 12)", parse = T) +
-  annotate('text', x = 5.9, y = 1, size = 7 / .pt, label = "bold(italic(n) == 6)", parse = T) +
+  annotate('text', x = 2, y = 4, size = 7 / .pt, label = "bold(italic(n)) == 12", parse = TRUE) +
+  annotate('text', x = 5.2, y = 3, size = 7 / .pt, label = "bold(italic(n) == 6)", parse = TRUE) +
+  annotate('text', x = 5.2, y = 2, size = 7 / .pt, label = "bold(italic(n) == 12)", parse = T) +
+  annotate('text', x = 5.2, y = 1, size = 7 / .pt, label = "bold(italic(n) == 6)", parse = T) +
   coord_cartesian(clip = "off") +
   theme_tidy(ratio = 1.4, fontsize = 7) +
   theme(plot.tag.position = c(.2,1.01),
@@ -184,11 +184,17 @@ nmds.scores %>%
   # Points for samples, coloured by nature
   geom_point(aes(colour = nature, shape = designation), size = 3) +
   # Labelled according to groundwater type
-  scale_color_manual(values = c(Biofilm = "#08519c", Planktonic = "#9ecae1")) +
-  scale_fill_manual(values = c(Biofilm = "#08519c", Planktonic = "#9ecae1")) +
+  scale_color_manual(values = c(Biofilm = "#08519c", Planktonic = "#9ecae1"), guide = "none") +
+  scale_fill_manual(values = c(Biofilm = "#08519c", Planktonic = "#9ecae1"), guide = "none") +
   annotate('text', x = -Inf, y = -Inf, size = 7/.pt, 
            label = paste('Stress = ', round(nmds$stress, digits = 2)),
            hjust = -0.1, vjust = -1, fontface = "bold"
+           ) +
+  annotate('text', x = 1, y = -0.6, size = 8/.pt, 
+           label = "Biofilm", fontface = "bold", color = "#08519c"
+           ) +
+  annotate('text', x = -0.6, y = 0.2, size = 8/.pt, 
+           label = "Planktonic", fontface = "bold", color = "#9ecae1"
            ) +
   ggrepel::geom_text_repel(aes(label = age), color = "black",
                   box.padding = 0.3, 
@@ -564,11 +570,17 @@ nmds.scores %>%
   # Points for samples, coloured by nature
   geom_point(aes(colour = nature, shape = designation), size = 3) +
   # Labelled according to groundwater type
-  scale_color_manual(values = c(Biofilm = "#08519c", Planktonic = "#9ecae1")) +
-  scale_fill_manual(values = c(Biofilm = "#08519c", Planktonic = "#9ecae1")) +
+  scale_color_manual(values = c(Biofilm = "#08519c", Planktonic = "#9ecae1"), guide = "none") +
+  scale_fill_manual(values = c(Biofilm = "#08519c", Planktonic = "#9ecae1"), guide = "none") +
   annotate('text', x = Inf, y = -Inf, size = 7/.pt, 
            label = paste('Stress = ', round(nmds$stress, digits = 2)),
            hjust = 1.1, vjust = -1, fontface = "bold",
+           ) +
+  annotate('text', x = -0.25, y = -0.15, size = 7/.pt, 
+           label = "Biofilm", fontface = "bold", color = "#08519c"
+           ) +
+  annotate('text', x = 0.25, y = 0.2, size = 7/.pt, 
+           label = "Planktonic", fontface = "bold", color = "#9ecae1"
            ) +
   geom_vline(xintercept = 0, linetype = 'dotted') +
   geom_hline(yintercept = 0, linetype = 'dotted') +
@@ -688,8 +700,8 @@ a + b
 ```
 
 ```{r export Fig. 5}
-ggsave("figures/fig_5.pdf", height = 12, width = 18, units = "cm")
-ggsave("figures/fig_5.png", height = 12, width = 18, units = "cm")
+ggsave("figures/fig_5x.pdf", height = 12, width = 18, units = "cm")
+ggsave("figures/fig_5x.png", height = 12, width = 18, units = "cm")
 ```
 
 
