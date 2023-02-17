@@ -21,3 +21,10 @@ figures
 flowcells_cache
 old
 QK1636.tsv
+ASV-ncbi.tsv
+ASV-table.tsv
+QK1636-survey
+QL1679-flowcells
+archive
+emapper-annotations.tsv
+ncbi-taxonomy.tsv
