@@ -94,8 +94,7 @@ seqtab %>%
 ```{r statistics alpha diversity}
 stat <- adiv %>% 
   group_by(designation, nature, age) %>% 
-  summarise(shannon = mean(shannon), .groups = "drop") %>%
-  mutate(nature = paste(designation,nature))
+  summarise(shannon = mean(shannon), .groups = "drop")
 
 suppressPackageStartupMessages(library(car))
 # Normality of the data (null hypothesis data is normally distributed)
@@ -105,7 +104,7 @@ car::qqPlot(stat$shannon)
 # Homogeneity of variance using Levene (null hypothesis variance is equal)
 leveneTest(shannon ~ env, data = stat)
 # Run ANOVA (null hypothesis diversity is equal)
-aov(shannon ~ nature, data = stat) %>% summary()
+aov(shannon ~ designation/nature, data = stat) %>% summary()
 # Post-hoc
 aov(shannon ~ paste(designation,nature), data = stat) %>% TukeyHSD()
 ```
@@ -232,16 +231,35 @@ seqtab %>%
   spread(seqid, count, fill = 0) %>%
   column_to_rownames("sample") -> t
 
-vegan::adonis(t[,c(-1)] ~ nature, data = t)
+vegan::adonis2(t[,c(-1)] ~ nature, data = t)
 
 seqtab %>%
   select(-relab) %>%
-  inner_join(smd[,c("sample","env")], by = "sample") %>% 
+  inner_join(smd[,c("sample","nature")], by = "sample") %>% 
   spread(seqid, count, fill = 0) %>%
   column_to_rownames("sample") -> t
   
 pairwiseAdonis::pairwise.adonis(t[,c(-1)], factors = t$env)
 ```
+
+```{r differential abundance}
+t <- seqtab %>% 
+  select(-relab) %>%
+  arrange(sample) %>%
+  pivot_wider(names_from = "sample", values_from = "count", values_fill = 0) %>%
+  column_to_rownames("seqid")
+
+i <- smd %>% 
+  filter(!is.na(age)) %>% 
+  arrange(sample)
+
+t <- ALDEx2::aldex(reads = t, conditions = i$nature)
+
+t %>% filter(we.eBH <= 0.05) %>% 
+  rownames_to_column("seqid") %>%
+  inner_join(gtdb, by = "seqid") %>% View()
+```
+
 
 
 
@@ -440,8 +458,19 @@ cols <- c("Unidentified" = "#A6CEE3",
           "UBA2262" = "#E31A1C", # Desulfobacterales (Delta)
           "Methylotuvimicrobium" = "#CAB2D6", # Methylococcales (Gamma)
           "JAHITL01" = "#B15928") # Patescibacteria     
+
+i <- c("QL-1679-S77","QL-1679-S72", # MM 20 d
+       "QL-1679-S71","QL-1679-S78", # MM 40 d
+       "QL-1679-S73","QL-1679-S79", # MM 75 d
+       "QL-1679-S81","QL-1679-S82", # TM 20 d
+       "QL-1679-S74","QL-1679-S80", # TM 40 d
+       "QL-1679-S75","QL-1679-S76")  # TM 75 d
+
+
+biofilm <- smd %>% filter(nature == "biofilm" & !is.na(age)) %>% pull(sample)
           
 seqtab %>%
+  filter(sample %in% biofilm) %>%
   inner_join(gtdb, by = "seqid") %>%
   group_by(genus, sample) %>%
   # Sum the abundance of each phylum within a sample
@@ -457,6 +486,7 @@ gtdb %>%
   replace_na(list("topphylum" = "Other")) -> taxref
 
 seqtab %>%
+  filter(sample %in% biofilm) %>%
   inner_join(taxref, by = "seqid") %>%
   # Summarize in order to have the sum for each category and topphylum
   group_by(sample, topphylum) %>% 
@@ -464,8 +494,7 @@ seqtab %>%
   # Call the plot
   ggplot(aes(x = fct_relevel(sample, i),
              y = relab * 100, 
-             fill = fct_relevel(topphylum,names(cols))
-             )
+             fill = topphylum)
          ) +
   labs(x = '', y = 'Relative abundance (%)', fill = "Genus") +
   geom_col() +
@@ -495,7 +524,7 @@ seqtab %>%
         axis.text.y = element_text(face = "bold"),
         legend.position = "right", legend.title = element_text(face = "bold", size = 7),
         panel.border = element_rect(size = 0.5, fill = NA)
-        ) -> p2
+        ) #-> p2
 ```
 
 
@@ -1203,3 +1232,102 @@ seqcpm %>%
         axis.line.x.bottom = element_line(colour = "black"))
 ```
 
+
+
+
+```{r}
+coord <- function(x, y) {
+  distance <- (x - 89)/0.173
+  if (y <= 391) {depth <- 0}
+  else {depth <- (y - 391)/0.1646}
+  return(paste("Distance is: ",round(distance,3)," m",", depth is: ",round(depth,3)," m", sep = ""))
+}
+i <- list(borehole = c("SA1229A-1","KA3385A-1R"), depth = c(-171.26, -448.35), distance = c(1100,1600))
+
+data.frame(i) %>% ggplot(aes(x = distance, y = depth)) +
+  geom_point(size = 2) +
+  annotate("segment", x = 405, xend = 445, y = -115, yend = 0, linetype = "dashed") +
+  annotate("segment", x = 428, xend = 486, y = -115, yend = 0, linetype = "dashed") +
+  annotate("segment", x = 1156, xend = 1358, y = 0, yend = -711, linetype = "dashed") +
+  annotate("segment", x = 1156, xend = 1428, y = 0, yend = -687, linetype = "dashed") +
+  annotate("segment", x = 1254, xend = 1358, y = -535, yend = 0, linetype = "dashed") +
+  annotate("segment", x = 1428, xend = 1584, y = -352, yend = 0, linetype = "dashed") +
+  annotate("segment", x = 688, xend = 723, y = -231, yend = 0, linetype = "dashed") +
+  annotate("segment", x = 688, xend = 769, y = -231, yend = 0, linetype = "dashed") +
+  annotate("segment", x = 740, xend = 792, y = -225, yend = 0, linetype = "dashed") +
+  annotate("segment", x = 855, xend = 908, y = 0, yend = -231, linetype = "dashed") +
+  annotate("segment", x = 867, xend = 948, y = 0, yend = -225, linetype = "dashed") +
+  # Land / sea segments: #f3e2d0 (land), 8da3ae (water)
+  annotate("segment", x = 0, xend = 202, y = 30, yend = 30, linewidth = 10, colour = "#f3e2d0") +
+  annotate("segment", x = 202, xend = 335, y = 30, yend = 30, linewidth = 10, colour = "#8da3ae") +
+  annotate("segment", x = 335, xend = 711, y = 30, yend = 30, linewidth = 10, colour = "#f3e2d0") +
+  annotate("segment", x = 711, xend = 855, y = 30, yend = 30, linewidth = 10, colour = "#8da3ae") +
+  annotate("segment", x = 855, xend = 942, y = 30, yend = 30, linewidth = 10, colour = "#f3e2d0") +
+  annotate("segment", x = 942, xend = 977, y = 30, yend = 30, linewidth = 10, colour = "#8da3ae") +
+  annotate("segment", x = 977, xend = 1029, y = 30, yend = 30, linewidth = 10, colour = "#f3e2d0") +
+  annotate("segment", x = 1029, xend = 1092, y = 30, yend = 30, linewidth = 10, colour = "#8da3ae") +
+  annotate("segment", x = 1092, xend = 1900, y = 30, yend = 30, linewidth = 10, colour = "#f3e2d0") +
+  # Labels for the islands
+  annotate("text", x = 523, y = 0, label = "Bockholmen", size = 8/.pt) +
+  annotate("text", x = 930, y = 0, label = "Borholmen", size = 8/.pt) +
+  annotate("text", x = 1496, y = 0, label = "Äspö", size = 8/.pt) +
+  # Lines for tunnel distance
+  annotate("segment", x = 52, xend = 52, y = -12, yend = -22) + # 100 m
+  annotate("segment", x = 243, xend = 243, y = -43, yend = -53) + # 300 m
+  annotate("segment", x = 618, xend = 618, y = -97, yend = -107) + # 700 m
+  annotate("segment", x = 815, xend = 815, y = -128, yend = -138) + # 900 m
+  annotate("segment", x = 994, xend = 994, y = -152, yend = -162) + # 1100 m
+  annotate("segment", x = 1168, xend = 1168, y = -176, yend = -186) + # 1300 m
+  annotate("segment", x = 1364, xend = 1364, y = -207, yend = -217) + # 1500 m
+  annotate("segment", x = 1653, xend = 1663, y = -261, yend = -261) + # 1900 m horizontal
+  annotate("segment", x = 1366, xend = 1376, y = -316, yend = -316) + # 2400 m horizontal
+  annotate("segment", x = 1661, xend = 1671, y = -383, yend = -383) + # 2900 m horizontal
+  annotate("segment", x = 1572, xend = 1572, y = -413, yend = -423) + # 3100 m
+  annotate("segment", x = 1728, xend = 1728, y = -456, yend = -466) + # 3500 m
+  # Labels for tunnel distance
+  annotate("text", x = 52, y = -30, label = "100", size = 7/.pt) + # 100 m
+  annotate("text", x = 243, y = -61, label = "300", size = 7/.pt) + # 300 m
+  annotate("text", x = 618, y = -115, label = "700", size = 7/.pt) + # 700 m
+  annotate("text", x = 815, y = -146, label = "900", size = 7/.pt) + # 900 m
+  annotate("text", x = 994, y = -170, label = "1100", size = 7/.pt) + # 1100 m
+  annotate("text", x = 1168, y = -194, label = "1300", size = 7/.pt) + # 1300 m
+  annotate("text", x = 1364, y = -225, label = "1500", size = 7/.pt) + # 1500 m
+  annotate("text", x = 1671, y = -261, label = "1900", size = 7/.pt) + # 1900 m horizontal
+  annotate("text", x = 1358, y = -316, label = "2400", size = 7/.pt) + # 2400 m horizontal
+  annotate("text", x = 1679, y = -383, label = "2900", size = 7/.pt) + # 2900 m horizontal
+  annotate("text", x = 1572, y = -431, label = "3100", size = 7/.pt) + # 3100 m
+  annotate("text", x = 1728, y = -474, label = "3600", size = 7/.pt) + # 3500 m
+  # Draw tunnel
+  scale_x_continuous(expand = c(0,002),
+                     breaks = c(0,500,1000,1500),
+                     labels = c("0","500","1,000","1,500")) +
+  scale_y_continuous(breaks = seq(0,-700, by = -100), 
+                     expand = c(0,002)) +
+  labs(x = "Distance (m)", y = "Depth (m)") +
+  theme(
+    panel.grid = element_blank(),
+    panel.background = element_blank(),
+    panel.border = element_rect(fill = NA, linewidth = 1),
+    axis.title = element_text(size = 8, colour = "black"),
+    axis.text = element_text(size = 8, colour = "black")
+  )
+```
+```{r}
+ggsave(filename = "äspö_draft.pdf", width = 14, height = 10, units = "cm")
+```
+
+
+```{r plot sweden}
+sweden <- sf::st_read("../Cultures/didactic-spork/data/SWE_adm/SWE_adm0.shp")
+baltic <- sf::st_read("../../Downloads/World_Seas_IHO_v3/World_Seas_IHO_v3.shp") %>% filter(NAME %in% c("Baltic Sea","Gulf of Bothnia"))
+
+
+ggplot() + 
+  geom_sf(data = baltic, colour = "#637e8b", fill = "#8da3ae") +
+  geom_sf(data = sweden, aes(fill = var1), colour = "#e3bc93", fill = "#f3e2d0") +
+  ggspatial::annotation_scale(location = "br") +
+  theme_void()
+```
+```{r}
+ggsave(filename = "sweden.png", width = 6, height = 10, units = "cm")
+```
